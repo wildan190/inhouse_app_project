@@ -16,6 +16,10 @@ class ProductProvider with ChangeNotifier {
   bool _isLoading = false;
   double _progress = 0;
   Set<String> _selectedOrderNumbers = {};
+  
+  // Processing time tracking
+  Duration _processingDuration = Duration.zero;
+  bool _isProcessing = false;
 
   // Pagination states
   int _currentPage = 1;
@@ -28,6 +32,8 @@ class ProductProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   double get progress => _progress;
   Set<String> get selectedOrderNumbers => _selectedOrderNumbers;
+  Duration get processingDuration => _processingDuration;
+  bool get isProcessing => _isProcessing;
 
   // Pagination getters
   int get currentPage => _currentPage;
@@ -195,21 +201,49 @@ class ProductProvider with ChangeNotifier {
     if (_selectedOrderNumbers.isEmpty) return;
     
     _isLoading = true;
-    _progress = 0.01; // Start with a tiny bit to avoid indeterminate state
+    _isProcessing = true;
+    _progress = 0.01;
+    _processingDuration = Duration.zero;
     notifyListeners();
+    
+    final stopwatch = Stopwatch()..start();
     
     List<Product> toProcess = _products.where((p) => _selectedOrderNumbers.contains(p.noPesanan)).toList();
     int total = toProcess.length;
+    int completed = 0;
 
-    for (int i = 0; i < total; i++) {
-      await mergeProduct(toProcess[i], silent: true);
-      _progress = (i + 1) / total;
-      notifyListeners();
-    }
+    // Use a higher concurrency level to maximize RAM and GPU usage
+    const int maxConcurrent = 8;
     
-    _selectedOrderNumbers.clear(); // Clear selection after merge
+    final List<Future<void>> workers = [];
+    int index = 0;
+
+    Future<void> runWorker() async {
+      while (index < total) {
+        final currentIdx = index++;
+        if (currentIdx >= total) break;
+        
+        await mergeProduct(toProcess[currentIdx], silent: true);
+        
+        completed++;
+        _progress = completed / total;
+        _processingDuration = stopwatch.elapsed;
+        notifyListeners();
+      }
+    }
+
+    for (int i = 0; i < (total < maxConcurrent ? total : maxConcurrent); i++) {
+      workers.add(runWorker());
+    }
+
+    await Future.wait(workers);
+    
+    stopwatch.stop();
+    _processingDuration = stopwatch.elapsed;
+    _selectedOrderNumbers.clear();
     await fetchProducts(updateLoading: false);
     _isLoading = false;
+    _isProcessing = false;
     _progress = 0;
     notifyListeners();
   }

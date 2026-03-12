@@ -3,17 +3,17 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/foundation.dart'; // Added for compute
 import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:path/path.dart' as p;
 import '../models/product.dart';
-
 import 'package:http/http.dart' as http;
 
 class ImageService {
   /// Merges a product's details and image into a new composite image.
   /// Optimized for performance and large file sizes (>500MB).
-  /// Maintains original image resolution (300 DPI) and adds a header area.
+  /// Maximizes GPU and RAM usage as requested.
   Future<String?> mergeProductImage(Product product, File? uploadedImage) async {
     try {
       final directory = await getApplicationDocumentsDirectory();
@@ -24,90 +24,56 @@ class ImageService {
 
       final outputPath = p.join(outputDir.path, 'merged_${product.noPesanan}_${DateTime.now().millisecondsSinceEpoch}.png');
 
-      // 1. Load Original Image (NO COMPRESSION)
-      ui.Image? uiImage;
-      if (uploadedImage != null && await uploadedImage.exists()) {
-        final Uint8List imageBytes = await uploadedImage.readAsBytes();
-        final ui.ImmutableBuffer buffer = await ui.ImmutableBuffer.fromUint8List(imageBytes);
-        final ui.ImageDescriptor descriptor = await ui.ImageDescriptor.encoded(buffer);
-        final ui.Codec codec = await descriptor.instantiateCodec(); // Full resolution
-        final ui.FrameInfo frameInfo = await codec.getNextFrame();
-        uiImage = frameInfo.image;
-        buffer.dispose();
-      }
+      // 1. Load Resources in Parallel (MAX PERFORMANCE)
+      final List<Future<ui.Image?>> loadingTasks = [];
+      
+      // Task for original image
+      loadingTasks.add(_loadOriginalImage(uploadedImage));
+      
+      // Task for linked image
+      loadingTasks.add(_loadLinkedImage(product.tautanGambarProduk));
+
+      final results = await Future.wait(loadingTasks);
+      final ui.Image? uiImage = results[0];
+      final ui.Image? linkedImage = results[1];
 
       if (uiImage == null) return null;
 
-      // 2. Fetch Linked Image (Tautan Gambar Produk)
-      ui.Image? linkedImage;
-      try {
-        if (product.tautanGambarProduk.isNotEmpty) {
-          final response = await http.get(Uri.parse(product.tautanGambarProduk));
-          if (response.statusCode == 200) {
-            final ui.ImmutableBuffer buffer = await ui.ImmutableBuffer.fromUint8List(response.bodyBytes);
-            final ui.ImageDescriptor descriptor = await ui.ImageDescriptor.encoded(buffer);
-            final ui.Codec codec = await descriptor.instantiateCodec();
-            final ui.FrameInfo frameInfo = await codec.getNextFrame();
-            linkedImage = frameInfo.image;
-            buffer.dispose();
-          }
-        }
-      } catch (e) {
-        print('Error fetching linked image: $e');
-      }
-
-      // 3. Calculate Dimensions for 300 DPI
-      // 300 DPI = 300 pixels per inch
-      // 1 cm = 0.393701 inches
-      // QR + Data Area: Total Lebar 9cm x Tinggi 2.5cm (Physical)
-      // BUT if the main image is huge, 9cm at 300DPI will be too small to see.
-      // We will use a larger scale if the image is high resolution.
+      // 2. Calculate Dimensions for 300 DPI
       const double dpi = 300.0;
       const double cmToInch = 0.393701;
       
-      // We'll use a dynamic scaling factor based on image width to keep it readable
-      // but ensure the minimum is 9cm @ 300 DPI
       double minWidthPx = 9 * cmToInch * dpi; // ~1063 px
       double containerWidthPx = minWidthPx;
       
-      // if image is very wide, let the header grow but maintain aspect ratio
       if (uiImage.width > containerWidthPx * 2) {
-        containerWidthPx = uiImage.width * 0.4; // Take 40% of image width
+        containerWidthPx = uiImage.width * 0.4;
       }
       
-      // Maintain the 9:2.5 aspect ratio
       double containerHeightPx = containerWidthPx * (2.5 / 9.0);
-
-      // Padding for the header area on the canvas
       double verticalPadding = containerHeightPx * 0.2;
       double headerHeightPx = containerHeightPx + verticalPadding;
-      
-      // Gap between header area and main image
-      const double gapBetweenHeaderAndImage = 60.0; // 60px gap
+      const double gapBetweenHeaderAndImage = 60.0;
 
       final int canvasWidth = uiImage.width;
       final int canvasHeight = uiImage.height + headerHeightPx.toInt() + gapBetweenHeaderAndImage.toInt();
 
+      // 3. Drawing Process (GPU ACCELERATED)
       final recorder = ui.PictureRecorder();
       final canvas = Canvas(recorder);
 
-      // 4. Draw Header Container (White Background, Right Aligned)
       final double margin = 40.0;
       final double containerLeft = canvasWidth - containerWidthPx - margin;
       final double containerTop = verticalPadding / 2;
 
+      // Draw Header Background
       final paint = Paint()..color = Colors.white;
       canvas.drawRect(
-        Rect.fromLTWH(
-          containerLeft, 
-          containerTop, 
-          containerWidthPx, 
-          containerHeightPx
-        ), 
+        Rect.fromLTWH(containerLeft, containerTop, containerWidthPx, containerHeightPx), 
         paint
       );
 
-      // 5. Draw QR and Details INSIDE the container
+      // Draw QR and Details (Awaited to ensure sequential drawing on canvas)
       await _drawDetailsInContainer(
         canvas, 
         product, 
@@ -115,24 +81,31 @@ class ImageService {
         containerTop, 
         containerWidthPx.toInt(), 
         containerHeightPx.toInt(),
-        linkedImage // Use the image from URL
+        linkedImage
       );
 
-      // 6. Draw the Original Image (Starting below the header area + gap)
+      // Draw the Original Image (Hardware accelerated)
       canvas.drawImage(uiImage, Offset(0, headerHeightPx + gapBetweenHeaderAndImage), Paint());
       
-      // Clean up
+      // Dispose original immediately after drawing
       uiImage.dispose();
       linkedImage?.dispose();
 
-      // 7. Finalize and Save
+      // 4. Finalize and Save
       final picture = recorder.endRecording();
+      // toImage is asynchronous and utilizes GPU memory
       final finalImg = await picture.toImage(canvasWidth, canvasHeight);
+      
+      // toByteData performs the encoding. PNG is lossless as requested.
       final byteData = await finalImg.toByteData(format: ui.ImageByteFormat.png);
       
       if (byteData != null) {
         final buffer = byteData.buffer.asUint8List();
-        await File(outputPath).writeAsBytes(buffer);
+        
+        // Use compute to offload file writing to a background isolate
+        // This prevents the main thread from blocking while writing huge files
+        await compute(_saveToFile, {'path': outputPath, 'bytes': buffer});
+        
         finalImg.dispose();
         picture.dispose();
         return outputPath;
@@ -141,6 +114,49 @@ class ImageService {
       print('Error in mergeProductImage: $e');
     }
     return null;
+  }
+
+  // Helper to load original image efficiently
+  Future<ui.Image?> _loadOriginalImage(File? uploadedImage) async {
+    if (uploadedImage == null || !await uploadedImage.exists()) return null;
+    try {
+      final Uint8List imageBytes = await uploadedImage.readAsBytes();
+      final ui.ImmutableBuffer buffer = await ui.ImmutableBuffer.fromUint8List(imageBytes);
+      final ui.ImageDescriptor descriptor = await ui.ImageDescriptor.encoded(buffer);
+      final ui.Codec codec = await descriptor.instantiateCodec();
+      final ui.FrameInfo frameInfo = await codec.getNextFrame();
+      buffer.dispose();
+      return frameInfo.image;
+    } catch (e) {
+      print('Error loading original image: $e');
+      return null;
+    }
+  }
+
+  // Helper to load linked image in parallel
+  Future<ui.Image?> _loadLinkedImage(String url) async {
+    if (url.isEmpty) return null;
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final ui.ImmutableBuffer buffer = await ui.ImmutableBuffer.fromUint8List(response.bodyBytes);
+        final ui.ImageDescriptor descriptor = await ui.ImageDescriptor.encoded(buffer);
+        final ui.Codec codec = await descriptor.instantiateCodec();
+        final ui.FrameInfo frameInfo = await codec.getNextFrame();
+        buffer.dispose();
+        return frameInfo.image;
+      }
+    } catch (e) {
+      print('Error fetching linked image: $e');
+    }
+    return null;
+  }
+
+  // Background isolate function for file writing
+  static Future<void> _saveToFile(Map<String, dynamic> args) async {
+    final String path = args['path'];
+    final Uint8List bytes = args['bytes'];
+    await File(path).writeAsBytes(bytes);
   }
 
   Future<void> _drawDetailsInContainer(

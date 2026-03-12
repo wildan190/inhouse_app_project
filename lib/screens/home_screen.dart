@@ -16,6 +16,16 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final ScrollController _horizontalController = ScrollController();
 
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, "0");
+    String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
+    String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
+    if (duration.inHours > 0) {
+      return "${twoDigits(duration.inHours)}:$twoDigitMinutes:$twoDigitSeconds";
+    }
+    return "$twoDigitMinutes:$twoDigitSeconds";
+  }
+
   @override
   void initState() {
     super.initState();
@@ -129,9 +139,19 @@ class _HomeScreenState extends State<HomeScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          productProvider.progress > 0 ? 'Processing Images...' : 'Working...',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              productProvider.progress > 0 ? 'Processing Images...' : 'Working...',
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            ),
+                            if (productProvider.isProcessing)
+                              Text(
+                                'Time elapsed: ${_formatDuration(productProvider.processingDuration)}',
+                                style: TextStyle(color: Colors.grey, fontSize: 12),
+                              ),
+                          ],
                         ),
                         Text(
                           '${(productProvider.progress * 100).toInt()}%',
@@ -148,6 +168,28 @@ class _HomeScreenState extends State<HomeScreen> {
                         color: Color(0xFF6D28D9),
                         minHeight: 8,
                       ),
+                    ),
+                  ],
+                ),
+              ),
+            
+            // Last processing time summary (if not loading)
+            if (!productProvider.isLoading && productProvider.processingDuration > Duration.zero)
+              Container(
+                margin: EdgeInsets.only(bottom: 16),
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Color(0xFF059669).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Color(0xFF059669).withOpacity(0.5)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.timer, color: Color(0xFF10B981), size: 16),
+                    SizedBox(width: 8),
+                    Text(
+                      'Last processing completed in: ${_formatDuration(productProvider.processingDuration)}',
+                      style: TextStyle(color: Color(0xFF10B981), fontSize: 13, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
