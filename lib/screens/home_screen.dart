@@ -14,12 +14,20 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final ScrollController _horizontalController = ScrollController();
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<ProductProvider>(context, listen: false).fetchProducts();
     });
+  }
+
+  @override
+  void dispose() {
+    _horizontalController.dispose();
+    super.dispose();
   }
 
   @override
@@ -148,8 +156,10 @@ class _HomeScreenState extends State<HomeScreen> {
             // Table Header & Content with Horizontal Scroll
             Expanded(
               child: Scrollbar(
+                controller: _horizontalController,
                 thumbVisibility: true,
                 child: SingleChildScrollView(
+                  controller: _horizontalController,
                   scrollDirection: Axis.horizontal,
                   child: Container(
                     width: 1600, // Fixed width for horizontal scroll
