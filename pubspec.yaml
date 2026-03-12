@@ -49,6 +49,7 @@ dependencies:
   native_device_orientation: ^2.0.0
   flutter_spinkit: ^5.2.0
   url_launcher: ^6.2.5
+  archive: ^3.6.1
 
 dev_dependencies:
   flutter_test:
