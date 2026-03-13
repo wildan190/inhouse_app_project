@@ -40,41 +40,41 @@ class ImageService {
 
       if (uiImage == null) return null;
 
-      // 2. Calculate Dimensions for 300 DPI
+      // 2. Calculate FIXED Dimensions for 300 DPI (9cm x 2.5cm)
       const double dpi = 300.0;
       const double cmToInch = 0.393701;
       
-      double minWidthPx = 9 * cmToInch * dpi; // ~1063 px
-      double containerWidthPx = minWidthPx;
+      // FIX: Exactly 9cm x 2.5cm at 300 DPI
+      final double containerWidthPx = 9 * cmToInch * dpi;   // ~1063 px
+      final double containerHeightPx = 2.5 * cmToInch * dpi; // ~295 px
       
-      if (uiImage.width > containerWidthPx * 2) {
-        containerWidthPx = uiImage.width * 0.4;
-      }
-      
-      double containerHeightPx = containerWidthPx * (2.5 / 9.0);
-      double verticalPadding = containerHeightPx * 0.2;
-      double headerHeightPx = containerHeightPx + verticalPadding;
+      // Vertical padding to give some space around the fixed container on the canvas
+      final double verticalPadding = 40.0; 
+      final double headerAreaHeight = containerHeightPx + verticalPadding;
       const double gapBetweenHeaderAndImage = 60.0;
 
       final int canvasWidth = uiImage.width;
-      final int canvasHeight = uiImage.height + headerHeightPx.toInt() + gapBetweenHeaderAndImage.toInt();
+      // Ensure canvas is at least as wide as the 9cm container
+      final int finalCanvasWidth = canvasWidth < containerWidthPx.toInt() ? containerWidthPx.toInt() + 80 : canvasWidth;
+      final int canvasHeight = uiImage.height + headerAreaHeight.toInt() + gapBetweenHeaderAndImage.toInt();
 
       // 3. Drawing Process (GPU ACCELERATED)
       final recorder = ui.PictureRecorder();
       final canvas = Canvas(recorder);
 
+      // Position container: Right aligned with a small margin
       final double margin = 40.0;
-      final double containerLeft = canvasWidth - containerWidthPx - margin;
+      final double containerLeft = finalCanvasWidth - containerWidthPx - margin;
       final double containerTop = verticalPadding / 2;
 
-      // Draw Header Background
+      // Draw Header Background (Exactly 9cm x 2.5cm)
       final paint = Paint()..color = Colors.white;
       canvas.drawRect(
         Rect.fromLTWH(containerLeft, containerTop, containerWidthPx, containerHeightPx), 
         paint
       );
 
-      // Draw QR and Details (Awaited to ensure sequential drawing on canvas)
+      // Draw QR and Details INSIDE the fixed container
       await _drawDetailsInContainer(
         canvas, 
         product, 
@@ -86,7 +86,9 @@ class ImageService {
       );
 
       // Draw the Original Image (Hardware accelerated)
-      canvas.drawImage(uiImage, Offset(0, headerHeightPx + gapBetweenHeaderAndImage), Paint());
+      // Center it if the canvas was widened for the header
+      double imageX = (finalCanvasWidth - uiImage.width) / 2;
+      canvas.drawImage(uiImage, Offset(imageX, headerAreaHeight + gapBetweenHeaderAndImage), Paint());
       
       // Dispose original immediately after drawing
       uiImage.dispose();
@@ -94,8 +96,7 @@ class ImageService {
 
       // 4. Finalize and Save
       final picture = recorder.endRecording();
-      // toImage is asynchronous and utilizes GPU memory
-      final finalImg = await picture.toImage(canvasWidth, canvasHeight);
+      final finalImg = await picture.toImage(finalCanvasWidth, canvasHeight);
       
       // toByteData performs the encoding. PNG is lossless as requested.
       final byteData = await finalImg.toByteData(format: ui.ImageByteFormat.png);
