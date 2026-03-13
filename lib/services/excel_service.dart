@@ -17,18 +17,26 @@ class ExcelService {
       
       Excel? excel;
       try {
-        excel = Excel.decodeBytes(bytes);
+        // First, try to normalize the byte stream to handle WPS/MS Excel differences
+        final normalizedBytes = _normalizeExcel(bytes);
+        excel = Excel.decodeBytes(normalizedBytes);
       } catch (e) {
-        print('Initial Excel decode failed: $e. Attempting repair...');
+        print('Excel decode failed after normalization: $e. Attempting aggressive repair...');
         try {
-          final repairedBytes = _repairExcel(bytes);
+          final repairedBytes = _repairExcel(bytes, aggressive: true);
           if (repairedBytes != null) {
             excel = Excel.decodeBytes(repairedBytes);
-            print('Excel repaired successfully!');
+            print('Excel aggressively repaired successfully!');
           }
         } catch (repairError) {
-          print('Repair failed: $repairError');
-          rethrow;
+          print('Aggressive repair failed: $repairError');
+          // Last resort: try to decode original bytes
+          try {
+            excel = Excel.decodeBytes(bytes);
+          } catch (lastError) {
+            print('Final attempt failed: $lastError');
+            rethrow;
+          }
         }
       }
 
@@ -98,29 +106,57 @@ class ExcelService {
     return null;
   }
 
-  /// Repairs corrupted Excel files by removing problematic metadata (like styles.xml)
-  /// that often causes the "custom numFmtId" error in the 'excel' package.
-  List<int>? _repairExcel(List<int> bytes) {
-    final archive = ZipDecoder().decodeBytes(bytes);
-    final newArchive = Archive();
+  /// Normalizes Excel structure to handle differences between WPS, MS Excel, and other exporters.
+  List<int> _normalizeExcel(List<int> bytes) {
+    try {
+      final archive = ZipDecoder().decodeBytes(bytes);
+      final newArchive = Archive();
 
-    bool stylesRemoved = false;
+      for (final file in archive) {
+        if (!file.isFile) continue;
 
-    for (final file in archive) {
-      // Skip the styles.xml file as it's the primary source of numFmtId errors
-      if (file.name == 'xl/styles.xml') {
-        stylesRemoved = true;
-        continue;
-      }
-      
-      if (file.isFile) {
+        // Skip non-essential metadata that often causes parsing failures in different environments
+        if (file.name.contains('calcChain.xml') || 
+            file.name.contains('printerSettings') || 
+            file.name.contains('customProperty')) {
+          continue;
+        }
+
         newArchive.addFile(ArchiveFile(file.name, file.size, file.content));
       }
+
+      return ZipEncoder().encode(newArchive) ?? bytes;
+    } catch (e) {
+      print('Normalization failed, using original bytes: $e');
+      return bytes;
     }
+  }
 
-    if (!stylesRemoved) return null; // If no styles found, maybe it's another error
+  /// Repairs corrupted Excel files by removing problematic metadata.
+  /// If aggressive is true, it removes styles.xml which is the primary source of numFmtId errors.
+  List<int>? _repairExcel(List<int> bytes, {bool aggressive = false}) {
+    try {
+      final archive = ZipDecoder().decodeBytes(bytes);
+      final newArchive = Archive();
+      bool modified = false;
 
-    return ZipEncoder().encode(newArchive);
+      for (final file in archive) {
+        if (!file.isFile) continue;
+
+        // Aggressively remove styles.xml to fix formatting errors
+        if (aggressive && file.name == 'xl/styles.xml') {
+          modified = true;
+          continue;
+        }
+
+        newArchive.addFile(ArchiveFile(file.name, file.size, file.content));
+      }
+
+      return modified ? ZipEncoder().encode(newArchive) : null;
+    } catch (e) {
+      print('Repair failed: $e');
+      return null;
+    }
   }
 
   String _getCellValueByHeader(List<Data?> row, Map<String, int> headerMap, String headerName) {
