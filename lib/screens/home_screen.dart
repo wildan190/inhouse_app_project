@@ -98,89 +98,26 @@ class _HomeScreenState extends State<HomeScreen> {
                   }
                 }, Color(0xFF374151)),
                 SizedBox(width: 6),
-                _buildActionButton('Upload by SKU', Icons.collections, () async {
-                  if (productProvider.products.isEmpty) return;
-                  
-                  // Show a simple dialog to pick SKU
-                  final skus = productProvider.products.map((p) => p.skuPlatform).toSet().toList();
-                  String? selectedSku = await showDialog<String>(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      backgroundColor: Color(0xFF1F2937),
-                      title: Text('Select SKU Platform', style: TextStyle(color: Colors.white, fontSize: 16)),
-                      content: Container(
-                        width: 300,
-                        child: ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: skus.length,
-                          itemBuilder: (context, index) => ListTile(
-                            title: Text(skus[index], style: TextStyle(color: Colors.white, fontSize: 13)),
-                            onTap: () => Navigator.pop(context, skus[index]),
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-
-                  if (selectedSku != null) {
-                    FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.image);
-                    if (result != null && result.files.single.path != null) {
-                      await productProvider.updateImageBySku(selectedSku, File(result.files.single.path!));
-                    }
-                  }
-                }, Color(0xFF4B5563)),
-                SizedBox(width: 6),
-                _buildActionButton('Upload by ID SKU', Icons.perm_identity, () async {
-                  if (productProvider.products.isEmpty) return;
-                  
-                  final idSkus = productProvider.products.map((p) => p.idSku).toSet().toList();
-                  String? selectedIdSku = await showDialog<String>(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      backgroundColor: Color(0xFF1F2937),
-                      title: Text('Select ID SKU', style: TextStyle(color: Colors.white, fontSize: 16)),
-                      content: Container(
-                        width: 300,
-                        child: ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: idSkus.length,
-                          itemBuilder: (context, index) => ListTile(
-                            title: Text(idSkus[index], style: TextStyle(color: Colors.white, fontSize: 13)),
-                            onTap: () => Navigator.pop(context, idSkus[index]),
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-
-                  if (selectedIdSku != null) {
-                    FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.image);
-                    if (result != null && result.files.single.path != null) {
-                      await productProvider.updateImageBySku(selectedIdSku, File(result.files.single.path!), isIdSku: true);
-                    }
-                  }
-                }, Color(0xFF4B5563)),
-                SizedBox(width: 6),
                 _buildActionButton('List Processed', Icons.playlist_add_check, productProvider.refreshProcessedList, Color(0xFF4B5563)),
                 SizedBox(width: 6), // Reduced from 8
-                _buildActionButton('Save All Merged', Icons.save_alt, () async {
-                   final success = await productProvider.saveAllMerged();
-                   if (!success && mounted) {
-                     ScaffoldMessenger.of(context).showSnackBar(
-                       SnackBar(
-                         content: Text('Gagal menyimpan: Pastikan SEMUA baris data telah diunggah gambarnya dan diproses merge.'),
-                         backgroundColor: Colors.redAccent,
-                       ),
-                     );
-                   } else if (success && mounted) {
-                     ScaffoldMessenger.of(context).showSnackBar(
-                       SnackBar(
-                         content: Text('Semua gambar (${productProvider.products.length} file) berhasil disimpan.'),
-                         backgroundColor: Colors.green,
-                       ),
-                     );
-                   }
-                 }, Color(0xFF059669)),
+                _buildActionButton('Save Selected Merged', Icons.save_alt, () async {
+                  final success = await productProvider.saveSelectedMerged();
+                  if (!success && mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Gagal menyimpan: Pastikan SEMUA baris pada pesanan yang dipilih telah diunggah gambarnya dan diproses merge.'),
+                        backgroundColor: Colors.redAccent,
+                      ),
+                    );
+                  } else if (success && mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Semua gambar pesanan terpilih berhasil disimpan.'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                }, Color(0xFF059669)),
                 SizedBox(width: 6), // Reduced from 8
                 _buildActionButton('Merge Selected', Icons.merge_type, productProvider.mergeSelected, Color(0xFF6D28D9)),
                 SizedBox(width: 6), // Reduced from 8
@@ -495,9 +432,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 SizedBox(width: 8),
-                Text('Order: $orderNumber', style: TextStyle(color: Color(0xFFA78BFA), fontWeight: FontWeight.bold, fontSize: 13)), // Reduced
+                SelectableText('Order: $orderNumber', style: TextStyle(color: Color(0xFFA78BFA), fontWeight: FontWeight.bold, fontSize: 13)), // Reduced
                 SizedBox(width: 8),
-                Text('(${products.length} Items)', style: TextStyle(color: Colors.grey, fontSize: 11)), // Reduced
+                SelectableText('(${products.length} Items)', style: TextStyle(color: Colors.grey, fontSize: 11)), // Reduced
               ],
             ),
           ),
@@ -546,11 +483,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(product.skuPlatform, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)), // Reduced from 14
+                      SelectableText(product.skuPlatform, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)), // Reduced from 14
                       SizedBox(height: 2),
-                      Text('SKU: ${product.idSku}', style: TextStyle(color: Color(0xFFA78BFA), fontSize: 11, fontWeight: FontWeight.w500)), // Reduced from 12
+                      SelectableText('SKU: ${product.idSku}', style: TextStyle(color: Color(0xFFA78BFA), fontSize: 11, fontWeight: FontWeight.w500)), // Reduced from 12
                       SizedBox(height: 1),
-                      Text('Option: ${product.spesifikasiProduk}', style: TextStyle(color: Colors.grey, fontSize: 11)), // Reduced from 12
+                      SelectableText('Option: ${product.spesifikasiProduk}', style: TextStyle(color: Colors.grey, fontSize: 11)), // Reduced from 12
                     ],
                   ),
                 ),
@@ -568,7 +505,43 @@ class _HomeScreenState extends State<HomeScreen> {
                   try {
                     FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.image);
                     if (result != null && result.files.single.path != null) {
-                      await provider.updateProductImage(product, File(result.files.single.path!));
+                      File imageFile = File(result.files.single.path!);
+                      
+                      // Show Sync Choice Dialog
+                      String? syncMode = await showDialog<String>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          backgroundColor: Color(0xFF1F2937),
+                          title: Text('Pilih Mode Sinkronisasi', style: TextStyle(color: Colors.white, fontSize: 16)),
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ListTile(
+                                leading: Icon(Icons.person, color: Colors.blue),
+                                title: Text('Hanya item ini', style: TextStyle(color: Colors.white, fontSize: 13)),
+                                subtitle: Text('Hanya memperbarui baris ini saja', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                                onTap: () => Navigator.pop(context, 'single'),
+                              ),
+                              ListTile(
+                                leading: Icon(Icons.collections, color: Colors.purple),
+                                title: Text('Berdasarkan SKU Platform', style: TextStyle(color: Colors.white, fontSize: 13)),
+                                subtitle: Text('Semua dengan SKU: ${product.skuPlatform}', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                                onTap: () => Navigator.pop(context, 'sku'),
+                              ),
+                              ListTile(
+                                leading: Icon(Icons.perm_identity, color: Colors.orange),
+                                title: Text('Berdasarkan ID SKU', style: TextStyle(color: Colors.white, fontSize: 13)),
+                                subtitle: Text('Semua dengan ID SKU: ${product.idSku}', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                                onTap: () => Navigator.pop(context, 'id_sku'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+
+                      if (syncMode != null) {
+                        await provider.updateProductImage(product, imageFile, syncMode: syncMode);
+                      }
                     }
                   } catch (e) {
                     if (mounted) {
@@ -623,7 +596,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     )
-                  : Text('PENDING', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                  : SelectableText('PENDING', style: TextStyle(color: Colors.grey, fontSize: 11)),
             ),
           ),
           SizedBox(width: 16),
@@ -635,12 +608,12 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(product.noPesanan, style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 13)), // Reduced from 14
+                SelectableText(product.noPesanan, style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 13)), // Reduced from 14
                 SizedBox(height: 2),
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(color: Color(0xFF6D28D9), borderRadius: BorderRadius.circular(4)),
-                  child: Text('BOOK', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)), // Reduced from 11
+                  child: Text('BOOK', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)), // This is a label, kept as Text
                 ),
               ],
             ),
@@ -650,7 +623,7 @@ class _HomeScreenState extends State<HomeScreen> {
           // Nomor Resi
           Expanded(
             flex: 3,
-            child: Text(
+            child: SelectableText(
               product.nomorResi,
               style: TextStyle(color: Colors.white, fontSize: 12), // Reduced from 13
             ),
@@ -660,7 +633,7 @@ class _HomeScreenState extends State<HomeScreen> {
           // Qty
           Expanded(
             flex: 1,
-            child: Text(
+            child: SelectableText(
               product.jumlahBarang.toString(),
               style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold), // Reduced from 13
             ),
@@ -671,7 +644,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Expanded(
             flex: 2,
             child: Center(
-              child: Text(
+              child: SelectableText(
                 product.createdAt != null ? product.createdAt.toString().split('.')[0].replaceAll(' ', '\n') : '-', 
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey, fontSize: 11), // Reduced from 12
@@ -679,7 +652,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           SizedBox(width: 16),
-          Expanded(flex: 2, child: Text((product.status ?? 'PENDING').toUpperCase(), style: TextStyle(color: Colors.white, fontSize: 11))), // Reduced
+          Expanded(flex: 2, child: SelectableText((product.status ?? 'PENDING').toUpperCase(), style: TextStyle(color: Colors.white, fontSize: 11))), // Reduced
           SizedBox(width: 16),
           Expanded(
             flex: 2,

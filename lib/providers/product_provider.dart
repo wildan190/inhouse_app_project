@@ -155,7 +155,7 @@ class ProductProvider with ChangeNotifier {
     }
   }
 
-  Future<void> updateProductImage(Product product, File imageFile) async {
+  Future<void> updateProductImage(Product product, File imageFile, {String syncMode = 'single'}) async {
     // Copy image to local app directory for persistence
     final db = await _dbService.database;
     final directory = Directory(p.dirname(db.path));
@@ -168,39 +168,7 @@ class ProductProvider with ChangeNotifier {
     final fileName = p.basename(imageFile.path);
     final localPath = p.join(imagesDir.path, fileName);
     
-    final localImageFile = await imageFile.copy(localPath);
-    
-    final updatedProduct = Product(
-      id: product.id,
-      skuPlatform: product.skuPlatform,
-      jumlahBarang: product.jumlahBarang,
-      noPesanan: product.noPesanan,
-      nomorResi: product.nomorResi,
-      idProduk: product.idProduk,
-      idSku: product.idSku,
-      spesifikasiProduk: product.spesifikasiProduk,
-      tautanGambarProduk: product.tautanGambarProduk,
-      localImagePath: localImageFile.path,
-      status: 'image_uploaded',
-    );
-
-    await _dbService.updateProduct(updatedProduct);
-    await fetchProducts();
-  }
-
-  Future<void> updateImageBySku(String skuValue, File imageFile, {bool isIdSku = false}) async {
-    final db = await _dbService.database;
-    final directory = Directory(p.dirname(db.path));
-    final imagesDir = Directory(p.join(directory.path, 'images'));
-    
-    if (!await imagesDir.exists()) {
-      await imagesDir.create(recursive: true);
-    }
-    
-    final fileName = p.basename(imageFile.path);
-    final localPath = p.join(imagesDir.path, fileName);
-    
-    // Check if file already exists to avoid redundant copies
+    // Copy file if it doesn't exist to avoid redundant work
     File localImageFile;
     if (await File(localPath).exists()) {
       localImageFile = File(localPath);
@@ -212,22 +180,31 @@ class ProductProvider with ChangeNotifier {
     _progress = 0.01;
     notifyListeners();
 
-    // Find all products with matching SKU or ID SKU
-    final targets = _products.where((p) => (isIdSku ? p.idSku : p.skuPlatform) == skuValue).toList();
+    // Determine target products based on selected syncMode
+    List<Product> targets = [];
+    if (syncMode == 'sku') {
+      targets = _products.where((p) => p.skuPlatform == product.skuPlatform).toList();
+    } else if (syncMode == 'id_sku') {
+      targets = _products.where((p) => p.idSku == product.idSku).toList();
+    } else {
+      // 'single' mode
+      targets = [product];
+    }
+    
     int total = targets.length;
 
     for (int i = 0; i < total; i++) {
-      final product = targets[i];
+      final target = targets[i];
       final updatedProduct = Product(
-        id: product.id,
-        skuPlatform: product.skuPlatform,
-        jumlahBarang: product.jumlahBarang,
-        noPesanan: product.noPesanan,
-        nomorResi: product.nomorResi,
-        idProduk: product.idProduk,
-        idSku: product.idSku,
-        spesifikasiProduk: product.spesifikasiProduk,
-        tautanGambarProduk: product.tautanGambarProduk,
+        id: target.id,
+        skuPlatform: target.skuPlatform,
+        jumlahBarang: target.jumlahBarang,
+        noPesanan: target.noPesanan,
+        nomorResi: target.nomorResi,
+        idProduk: target.idProduk,
+        idSku: target.idSku,
+        spesifikasiProduk: target.spesifikasiProduk,
+        tautanGambarProduk: target.tautanGambarProduk,
         localImagePath: localImageFile.path,
         status: 'image_uploaded',
       );
@@ -356,15 +333,17 @@ class ProductProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> saveAllMerged() async {
-    if (_products.isEmpty) return false;
+  Future<bool> saveSelectedMerged() async {
+    if (_selectedOrderNumbers.isEmpty) return false;
 
-    // Filter products that have a path recorded in database
-    final mergedProducts = _products.where((p) => p.mergedImagePath != null).toList();
+    // Filter products belonging to selected orders
+    final selectedProducts = _products.where((p) => _selectedOrderNumbers.contains(p.noPesanan)).toList();
     
-    // STRICT CHECK: If number of merged products is less than total data, FAIL.
-    // This ensures user has uploaded and merged ALL rows before saving.
-    if (mergedProducts.length < _products.length) return false;
+    // Filter those that have a merged path recorded
+    final mergedProducts = selectedProducts.where((p) => p.mergedImagePath != null).toList();
+    
+    // STRICT CHECK: All items in the SELECTED orders must be merged
+    if (mergedProducts.length < selectedProducts.length) return false;
 
     // Verify all recorded files actually exist on disk
     for (var p in mergedProducts) {
@@ -401,8 +380,7 @@ class ProductProvider with ChangeNotifier {
     _progress = 0;
     notifyListeners();
     
-    // Return true ONLY if ALL files were successfully copied
-    return copiedCount == _products.length;
+    return copiedCount == selectedProducts.length;
   }
 
   Future<bool> exportOrderByNumber(String orderNumber) async {

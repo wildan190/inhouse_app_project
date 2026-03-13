@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:archive/archive.dart';
@@ -115,14 +116,33 @@ class ExcelService {
       for (final file in archive) {
         if (!file.isFile) continue;
 
-        // Skip non-essential metadata that often causes parsing failures in different environments
+        // Skip non-essential metadata and visual objects (drawings, media) 
+        // that often cause parsing failures when images are embedded in the sheet.
+        // We only need the TEXT/URL data, not the physical images inside Excel.
         if (file.name.contains('calcChain.xml') || 
             file.name.contains('printerSettings') || 
-            file.name.contains('customProperty')) {
+            file.name.contains('customProperty') ||
+            file.name.contains('drawings/') || 
+            file.name.contains('media/') || 
+            file.name.endsWith('.vml') ||
+            file.name.contains('_rels/drawing')) {
           continue;
         }
 
-        newArchive.addFile(ArchiveFile(file.name, file.size, file.content));
+        dynamic content = file.content;
+        
+        // If it's a worksheet, strip drawing tags to prevent crash when physical images are gone
+        if (file.name.startsWith('xl/worksheets/sheet') && file.name.endsWith('.xml')) {
+          String xml = String.fromCharCodes(content as List<int>);
+          // Aggressively remove <drawing ... /> and <legacyDrawing ... /> tags
+          xml = xml.replaceAll(RegExp(r'<drawing[^>]*/>'), '');
+          xml = xml.replaceAll(RegExp(r'<drawing[^>]*>.*?</drawing>', dotAll: true), '');
+          xml = xml.replaceAll(RegExp(r'<legacyDrawing[^>]*/>'), '');
+          xml = xml.replaceAll(RegExp(r'<legacyDrawing[^>]*>.*?</legacyDrawing>', dotAll: true), '');
+          content = Uint8List.fromList(xml.codeUnits);
+        }
+
+        newArchive.addFile(ArchiveFile(file.name, file.size, content));
       }
 
       return ZipEncoder().encode(newArchive) ?? bytes;
@@ -133,7 +153,7 @@ class ExcelService {
   }
 
   /// Repairs corrupted Excel files by removing problematic metadata.
-  /// If aggressive is true, it removes styles.xml which is the primary source of numFmtId errors.
+  /// If aggressive is true, it removes styles.xml and drawings to ensure raw data can be read.
   List<int>? _repairExcel(List<int> bytes, {bool aggressive = false}) {
     try {
       final archive = ZipDecoder().decodeBytes(bytes);
@@ -143,13 +163,26 @@ class ExcelService {
       for (final file in archive) {
         if (!file.isFile) continue;
 
-        // Aggressively remove styles.xml to fix formatting errors
-        if (aggressive && file.name == 'xl/styles.xml') {
+        // Aggressively remove styles and drawings to fix formatting/object errors
+        if (aggressive && (file.name == 'xl/styles.xml' || file.name.contains('drawings/'))) {
           modified = true;
           continue;
         }
 
-        newArchive.addFile(ArchiveFile(file.name, file.size, file.content));
+        dynamic content = file.content;
+        
+        // Also strip from sheets in aggressive mode
+        if (aggressive && file.name.startsWith('xl/worksheets/sheet') && file.name.endsWith('.xml')) {
+          String xml = String.fromCharCodes(content as List<int>);
+          xml = xml.replaceAll(RegExp(r'<drawing[^>]*/>'), '');
+          xml = xml.replaceAll(RegExp(r'<drawing[^>]*>.*?</drawing>', dotAll: true), '');
+          xml = xml.replaceAll(RegExp(r'<legacyDrawing[^>]*/>'), '');
+          xml = xml.replaceAll(RegExp(r'<legacyDrawing[^>]*>.*?</legacyDrawing>', dotAll: true), '');
+          content = Uint8List.fromList(xml.codeUnits);
+          modified = true;
+        }
+
+        newArchive.addFile(ArchiveFile(file.name, file.size, content));
       }
 
       return modified ? ZipEncoder().encode(newArchive) : null;
