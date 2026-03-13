@@ -20,6 +20,7 @@ class ProductProvider with ChangeNotifier {
   // Processing time tracking
   Duration _processingDuration = Duration.zero;
   bool _isProcessing = false;
+  List<String> _processedOrderNumbers = [];
 
   // Pagination states
   int _currentPage = 1;
@@ -34,6 +35,25 @@ class ProductProvider with ChangeNotifier {
   Set<String> get selectedOrderNumbers => _selectedOrderNumbers;
   Duration get processingDuration => _processingDuration;
   bool get isProcessing => _isProcessing;
+  List<String> get processedOrderNumbers => _processedOrderNumbers;
+
+  void clearProcessedOrders() {
+    _processedOrderNumbers.clear();
+    notifyListeners();
+  }
+
+  void refreshProcessedList() {
+    // Get all unique order numbers that have at least one product with status 'completed'
+    // and where the physical file actually exists
+    final successfulOrders = _products
+        .where((p) => p.status == 'completed' && p.mergedImagePath != null)
+        .map((p) => p.noPesanan)
+        .toSet()
+        .toList();
+    
+    _processedOrderNumbers = successfulOrders;
+    notifyListeners();
+  }
 
   // Pagination getters
   int get currentPage => _currentPage;
@@ -168,6 +188,61 @@ class ProductProvider with ChangeNotifier {
     await fetchProducts();
   }
 
+  Future<void> updateImageBySku(String skuValue, File imageFile, {bool isIdSku = false}) async {
+    final db = await _dbService.database;
+    final directory = Directory(p.dirname(db.path));
+    final imagesDir = Directory(p.join(directory.path, 'images'));
+    
+    if (!await imagesDir.exists()) {
+      await imagesDir.create(recursive: true);
+    }
+    
+    final fileName = p.basename(imageFile.path);
+    final localPath = p.join(imagesDir.path, fileName);
+    
+    // Check if file already exists to avoid redundant copies
+    File localImageFile;
+    if (await File(localPath).exists()) {
+      localImageFile = File(localPath);
+    } else {
+      localImageFile = await imageFile.copy(localPath);
+    }
+
+    _isLoading = true;
+    _progress = 0.01;
+    notifyListeners();
+
+    // Find all products with matching SKU or ID SKU
+    final targets = _products.where((p) => (isIdSku ? p.idSku : p.skuPlatform) == skuValue).toList();
+    int total = targets.length;
+
+    for (int i = 0; i < total; i++) {
+      final product = targets[i];
+      final updatedProduct = Product(
+        id: product.id,
+        skuPlatform: product.skuPlatform,
+        jumlahBarang: product.jumlahBarang,
+        noPesanan: product.noPesanan,
+        nomorResi: product.nomorResi,
+        idProduk: product.idProduk,
+        idSku: product.idSku,
+        spesifikasiProduk: product.spesifikasiProduk,
+        tautanGambarProduk: product.tautanGambarProduk,
+        localImagePath: localImageFile.path,
+        status: 'image_uploaded',
+      );
+
+      await _dbService.updateProduct(updatedProduct);
+      _progress = (i + 1) / total;
+      notifyListeners();
+    }
+
+    await fetchProducts(updateLoading: false);
+    _isLoading = false;
+    _progress = 0;
+    notifyListeners();
+  }
+
   Future<void> mergeProduct(Product product, {bool silent = false}) async {
     final mergedPath = await _imageService.mergeProductImage(
       product,
@@ -237,6 +312,14 @@ class ProductProvider with ChangeNotifier {
     }
 
     await Future.wait(workers);
+
+    // Track processed order numbers for the sidebar
+    final newlyProcessed = toProcess.map((p) => p.noPesanan).toSet().toList();
+    _processedOrderNumbers = [...newlyProcessed, ..._processedOrderNumbers];
+    // Limit to last 50 processed orders for performance
+    if (_processedOrderNumbers.length > 50) {
+      _processedOrderNumbers = _processedOrderNumbers.sublist(0, 50);
+    }
     
     stopwatch.stop();
     _processingDuration = stopwatch.elapsed;
@@ -273,18 +356,32 @@ class ProductProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> saveAllMerged() async {
+  Future<bool> saveAllMerged() async {
+    if (_products.isEmpty) return false;
+
+    // Filter products that have a path recorded in database
     final mergedProducts = _products.where((p) => p.mergedImagePath != null).toList();
-    if (mergedProducts.isEmpty) return;
+    
+    // STRICT CHECK: If number of merged products is less than total data, FAIL.
+    // This ensures user has uploaded and merged ALL rows before saving.
+    if (mergedProducts.length < _products.length) return false;
+
+    // Verify all recorded files actually exist on disk
+    for (var p in mergedProducts) {
+      if (!await File(p.mergedImagePath!).exists()) {
+        return false;
+      }
+    }
 
     String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
-    if (selectedDirectory == null) return;
+    if (selectedDirectory == null) return false;
 
     _isLoading = true;
     _progress = 0.01;
     notifyListeners();
 
     int total = mergedProducts.length;
+    int copiedCount = 0;
 
     for (int i = 0; i < total; i++) {
       final product = mergedProducts[i];
@@ -293,6 +390,7 @@ class ProductProvider with ChangeNotifier {
         final fileName = p.basename(product.mergedImagePath!);
         final destinationPath = p.join(selectedDirectory, fileName);
         await sourceFile.copy(destinationPath);
+        copiedCount++;
       }
       _progress = (i + 1) / total;
       notifyListeners();
@@ -302,6 +400,57 @@ class ProductProvider with ChangeNotifier {
     _isLoading = false;
     _progress = 0;
     notifyListeners();
+    
+    // Return true ONLY if ALL files were successfully copied
+    return copiedCount == _products.length;
+  }
+
+  Future<bool> exportOrderByNumber(String orderNumber) async {
+    final orderProducts = _products.where((p) => p.noPesanan == orderNumber && p.mergedImagePath != null).toList();
+    if (orderProducts.isEmpty) return false;
+
+    // Double check physical file existence
+    final List<Product> validProducts = [];
+    for (var p in orderProducts) {
+      if (await File(p.mergedImagePath!).exists()) {
+        validProducts.add(p);
+      }
+    }
+    
+    if (validProducts.isEmpty) return false;
+
+    String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
+    if (selectedDirectory == null) return false;
+
+    _isLoading = true;
+    _progress = 0.01;
+    notifyListeners();
+
+    int total = validProducts.length;
+    int copiedCount = 0;
+
+    for (int i = 0; i < total; i++) {
+      final product = validProducts[i];
+      final sourceFile = File(product.mergedImagePath!);
+      final fileName = p.basename(product.mergedImagePath!);
+      final destinationPath = p.join(selectedDirectory, fileName);
+      
+      try {
+        await sourceFile.copy(destinationPath);
+        copiedCount++;
+      } catch (e) {
+        print('Error exporting individual file: $e');
+      }
+      
+      _progress = (i + 1) / total;
+      notifyListeners();
+    }
+
+    _isLoading = false;
+    _progress = 0;
+    notifyListeners();
+    
+    return copiedCount > 0;
   }
 
   Future<void> deleteProduct(int id) async {
