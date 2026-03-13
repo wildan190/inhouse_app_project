@@ -85,6 +85,36 @@ class DatabaseService {
     );
   }
 
+  Future<int> updateProductsImageBulk(String localPath, {String? skuPlatform, String? idSku}) async {
+    Database db = await database;
+    Map<String, dynamic> values = {
+      'local_image_path': localPath,
+      'merged_image_path': null, // Reset merged image as source has changed
+      'status': 'image_uploaded'
+    };
+    
+    String whereClause = '';
+    List<dynamic> whereArgs = [];
+    
+    if (skuPlatform != null && idSku != null) {
+      whereClause = 'sku_platform = ? AND id_sku = ?';
+      whereArgs = [skuPlatform, idSku];
+    } else if (idSku != null) {
+      whereClause = 'id_sku = ?';
+      whereArgs = [idSku];
+    } else {
+      // If no criteria provided, we don't do bulk update (safety)
+      return 0;
+    }
+    
+    return await db.update(
+      'products',
+      values,
+      where: whereClause,
+      whereArgs: whereArgs,
+    );
+  }
+
   Future<int> deleteProduct(int id) async {
     Database db = await database;
     return await db.delete(

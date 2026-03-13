@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:desktop_drop/desktop_drop.dart';
 import '../providers/product_provider.dart';
 import '../models/product.dart';
 import 'dart:io';
@@ -15,6 +16,8 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final ScrollController _horizontalController = ScrollController();
+  int? _draggingProductId;
+  String _globalUploadMode = 'single'; // Added global upload mode
 
   String _formatDuration(Duration duration) {
     String twoDigits(int n) => n.toString().padLeft(2, "0");
@@ -38,6 +41,17 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _horizontalController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleImageUpload(Product product, File imageFile, ProductProvider provider) async {
+    try {
+      // Automatically use global upload mode instead of showing a dialog
+      await provider.updateProductImage(product, imageFile, syncMode: _globalUploadMode);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
   }
 
   @override
@@ -85,6 +99,25 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ],
+                SizedBox(width: 24),
+                // Global Upload Mode Radio Buttons
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Color(0xFF1F2937).withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Color(0xFF374151)),
+                  ),
+                  child: Row(
+                    children: [
+                      Text('Upload Rule:', style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
+                      SizedBox(width: 12),
+                      _buildUploadModeRadio('Single', 'single', Colors.blue),
+                      _buildUploadModeRadio('SKU', 'sku', Colors.purple),
+                      _buildUploadModeRadio('ID SKU', 'id_sku', Colors.orange),
+                    ],
+                  ),
+                ),
                 Spacer(),
                 _buildActionButton('Import Excel', Icons.upload_file, () async {
                   try {
@@ -500,69 +533,60 @@ class _HomeScreenState extends State<HomeScreen> {
           Expanded(
             flex: 2,
             child: Center(
-              child: InkWell(
-                onTap: () async {
-                  try {
-                    FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.image);
-                    if (result != null && result.files.single.path != null) {
-                      File imageFile = File(result.files.single.path!);
-                      
-                      // Show Sync Choice Dialog
-                      String? syncMode = await showDialog<String>(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          backgroundColor: Color(0xFF1F2937),
-                          title: Text('Pilih Mode Sinkronisasi', style: TextStyle(color: Colors.white, fontSize: 16)),
-                          content: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              ListTile(
-                                leading: Icon(Icons.person, color: Colors.blue),
-                                title: Text('Hanya item ini', style: TextStyle(color: Colors.white, fontSize: 13)),
-                                subtitle: Text('Hanya memperbarui baris ini saja', style: TextStyle(color: Colors.grey, fontSize: 11)),
-                                onTap: () => Navigator.pop(context, 'single'),
-                              ),
-                              ListTile(
-                                leading: Icon(Icons.collections, color: Colors.purple),
-                                title: Text('Berdasarkan SKU Platform', style: TextStyle(color: Colors.white, fontSize: 13)),
-                                subtitle: Text('Semua dengan SKU: ${product.skuPlatform}', style: TextStyle(color: Colors.grey, fontSize: 11)),
-                                onTap: () => Navigator.pop(context, 'sku'),
-                              ),
-                              ListTile(
-                                leading: Icon(Icons.perm_identity, color: Colors.orange),
-                                title: Text('Berdasarkan ID SKU', style: TextStyle(color: Colors.white, fontSize: 13)),
-                                subtitle: Text('Semua dengan ID SKU: ${product.idSku}', style: TextStyle(color: Colors.grey, fontSize: 11)),
-                                onTap: () => Navigator.pop(context, 'id_sku'),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-
-                      if (syncMode != null) {
-                        await provider.updateProductImage(product, imageFile, syncMode: syncMode);
-                      }
-                    }
-                  } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-                    }
+              child: DropTarget(
+                onDragDone: (detail) async {
+                  if (detail.files.isNotEmpty) {
+                    final file = File(detail.files.first.path);
+                    await _handleImageUpload(product, file, provider);
                   }
                 },
-                child: Container(
-                  width: 60, // Reduced from 80
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: Color(0xFF111827),
-                    border: Border.all(color: Color(0xFF374151)),
-                    borderRadius: BorderRadius.circular(6),
+                onDragEntered: (detail) {
+                  setState(() {
+                    _draggingProductId = product.id;
+                  });
+                },
+                onDragExited: (detail) {
+                  setState(() {
+                    _draggingProductId = null;
+                  });
+                },
+                child: InkWell(
+                  onTap: () async {
+                    try {
+                      FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.image);
+                      if (result != null && result.files.single.path != null) {
+                        File imageFile = File(result.files.single.path!);
+                        await _handleImageUpload(product, imageFile, provider);
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                      }
+                    }
+                  },
+                  child: AnimatedContainer(
+                    duration: Duration(milliseconds: 200),
+                    width: 60, // Reduced from 80
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: _draggingProductId == product.id ? Color(0xFF374151) : Color(0xFF111827),
+                      border: Border.all(
+                        color: _draggingProductId == product.id ? Color(0xFFA78BFA) : Color(0xFF374151),
+                        width: _draggingProductId == product.id ? 2 : 1,
+                      ),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: product.localImagePath != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(5),
+                            child: Image.file(File(product.localImagePath!), fit: BoxFit.cover, cacheWidth: 120),
+                          )
+                        : Icon(
+                            _draggingProductId == product.id ? Icons.file_upload : Icons.add,
+                            color: _draggingProductId == product.id ? Color(0xFFA78BFA) : Colors.grey,
+                            size: 20,
+                          ),
                   ),
-                  child: product.localImagePath != null
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(5),
-                          child: Image.file(File(product.localImagePath!), fit: BoxFit.cover, cacheWidth: 120),
-                        )
-                      : Icon(Icons.add, color: Colors.grey, size: 20),
                 ),
               ),
             ),
@@ -751,4 +775,30 @@ class _HomeScreenState extends State<HomeScreen> {
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         ),
       );
+
+  Widget _buildUploadModeRadio(String label, String value, Color activeColor) {
+    return InkWell(
+      onTap: () => setState(() => _globalUploadMode = value),
+      child: Padding(
+        padding: const EdgeInsets.only(right: 12.0),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              height: 24,
+              width: 24,
+              child: Radio<String>(
+                value: value,
+                groupValue: _globalUploadMode,
+                activeColor: activeColor,
+                onChanged: (val) => setState(() => _globalUploadMode = val!),
+              ),
+            ),
+            SizedBox(width: 4),
+            Text(label, style: TextStyle(color: Colors.white, fontSize: 11)),
+          ],
+        ),
+      ),
+    );
+  }
 }

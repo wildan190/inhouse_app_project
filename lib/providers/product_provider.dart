@@ -177,44 +177,45 @@ class ProductProvider with ChangeNotifier {
     }
 
     _isLoading = true;
-    _progress = 0.01;
+    _progress = 0.5;
     notifyListeners();
 
-    // Determine target products based on selected syncMode
-    List<Product> targets = [];
-    if (syncMode == 'sku') {
-      targets = _products.where((p) => p.skuPlatform == product.skuPlatform).toList();
-    } else if (syncMode == 'id_sku') {
-      targets = _products.where((p) => p.idSku == product.idSku).toList();
-    } else {
-      // 'single' mode
-      targets = [product];
-    }
-    
-    int total = targets.length;
-
-    for (int i = 0; i < total; i++) {
-      final target = targets[i];
+    if (syncMode == 'single') {
       final updatedProduct = Product(
-        id: target.id,
-        skuPlatform: target.skuPlatform,
-        jumlahBarang: target.jumlahBarang,
-        noPesanan: target.noPesanan,
-        nomorResi: target.nomorResi,
-        idProduk: target.idProduk,
-        idSku: target.idSku,
-        spesifikasiProduk: target.spesifikasiProduk,
-        tautanGambarProduk: target.tautanGambarProduk,
+        id: product.id,
+        skuPlatform: product.skuPlatform,
+        jumlahBarang: product.jumlahBarang,
+        noPesanan: product.noPesanan,
+        nomorResi: product.nomorResi,
+        idProduk: product.idProduk,
+        idSku: product.idSku,
+        spesifikasiProduk: product.spesifikasiProduk,
+        tautanGambarProduk: product.tautanGambarProduk,
         localImagePath: localImageFile.path,
+        mergedImagePath: product.mergedImagePath, // Preserve existing merged image
         status: 'image_uploaded',
       );
-
       await _dbService.updateProduct(updatedProduct);
-      _progress = (i + 1) / total;
-      notifyListeners();
+    } else if (syncMode == 'sku') {
+      await _dbService.updateProductsImageBulk(
+        localImageFile.path,
+        skuPlatform: product.skuPlatform,
+        idSku: product.idSku,
+      );
+    } else if (syncMode == 'id_sku') {
+      await _dbService.updateProductsImageBulk(
+        localImageFile.path,
+        idSku: product.idSku,
+      );
     }
 
-    await fetchProducts(updateLoading: false);
+    _progress = 0.9;
+    notifyListeners();
+    
+    // CRITICAL: Fetch ALL products from database to ensure memory state matches DB
+    _products = await _dbService.getProducts();
+    _updatePaginatedData();
+    
     _isLoading = false;
     _progress = 0;
     notifyListeners();
