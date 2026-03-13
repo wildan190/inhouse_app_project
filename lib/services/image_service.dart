@@ -9,6 +9,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:path/path.dart' as p;
 import '../models/product.dart';
 import 'package:http/http.dart' as http;
+import 'package:archive/archive.dart'; // Added for CRC32 calculation
 
 class ImageService {
   /// Merges a product's details and image into a new composite image.
@@ -100,7 +101,11 @@ class ImageService {
       final byteData = await finalImg.toByteData(format: ui.ImageByteFormat.png);
       
       if (byteData != null) {
-        final buffer = byteData.buffer.asUint8List();
+        Uint8List buffer = byteData.buffer.asUint8List();
+        
+        // 5. Inject DPI Metadata (300 DPI) for Photoshop/Print
+        // This ensures the file is recognized as 300 DPI instead of 72 DPI
+        buffer = _injectDpi(buffer, 300);
         
         // Use compute to offload file writing to a background isolate
         // This prevents the main thread from blocking while writing huge files
@@ -114,6 +119,61 @@ class ImageService {
       print('Error in mergeProductImage: $e');
     }
     return null;
+  }
+
+  /// Injects a pHYs chunk into the PNG byte stream to specify DPI.
+  /// Standard PNGs from dart:ui don't include DPI metadata, causing them to default to 72 DPI.
+  /// 300 DPI = 11811 pixels per meter.
+  static Uint8List _injectDpi(Uint8List pngBytes, int dpi) {
+    try {
+      // 1. Calculate Pixels Per Meter
+      // 300 DPI = 300 pixels / 0.0254 meters = 11811.02...
+      final int ppm = (dpi / 0.0254).round();
+      
+      // 2. Prepare pHYs Chunk Data
+      final physData = ByteData(9);
+      physData.setUint32(0, ppm, Endian.big); // X axis
+      physData.setUint32(4, ppm, Endian.big); // Y axis
+      physData.setUint8(8, 1); // Unit: meter (1)
+
+      // 3. Prepare pHYs Chunk Type ('pHYs')
+      final physType = Uint8List.fromList([112, 72, 89, 115]); // p H Y s
+      
+      // 4. Calculate CRC32 (Type + Data)
+      final crcInput = Uint8List(4 + 9);
+      crcInput.setRange(0, 4, physType);
+      crcInput.setRange(4, 13, physData.buffer.asUint8List());
+      
+      // package:archive provides getCrc32
+      final int crc = getCrc32(crcInput);
+
+      // 5. Construct Full pHYs Chunk
+      // [Length (4)] [Type (4)] [Data (9)] [CRC (4)]
+      final physChunk = ByteData(4 + 4 + 9 + 4);
+      physChunk.setUint32(0, 9, Endian.big); // Length of data
+      physChunk.setUint8(4, 112); // p
+      physChunk.setUint8(5, 72);  // H
+      physChunk.setUint8(6, 89);  // Y
+      physChunk.setUint8(7, 115); // s
+      for (int i = 0; i < 9; i++) {
+        physChunk.setUint8(8 + i, physData.getUint8(i));
+      }
+      physChunk.setUint32(17, crc, Endian.big); // CRC
+
+      // 6. Insert after IHDR chunk
+      // PNG Signature (8 bytes) + IHDR Chunk (Length 4 + Type 4 + Data 13 + CRC 4 = 25 bytes)
+      // Total offset to insert pHYs: 8 + 25 = 33
+      if (pngBytes.length > 33) {
+        final result = Uint8List(pngBytes.length + physChunk.lengthInBytes);
+        result.setRange(0, 33, pngBytes.sublist(0, 33));
+        result.setRange(33, 33 + physChunk.lengthInBytes, physChunk.buffer.asUint8List());
+        result.setRange(33 + physChunk.lengthInBytes, result.length, pngBytes.sublist(33));
+        return result;
+      }
+    } catch (e) {
+      print('Failed to inject DPI: $e');
+    }
+    return pngBytes;
   }
 
   // Helper to load original image efficiently
