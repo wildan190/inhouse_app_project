@@ -97,11 +97,17 @@ class DatabaseService {
     List<dynamic> whereArgs = [];
     
     if (skuPlatform != null && idSku != null) {
-      whereClause = 'sku_platform = ? AND id_sku = ?';
-      whereArgs = [skuPlatform, idSku];
+      // Very specific match (both platform and variation)
+      whereClause = 'LOWER(TRIM(sku_platform)) = ? AND LOWER(TRIM(id_sku)) = ?';
+      whereArgs = [skuPlatform.trim().toLowerCase(), idSku.trim().toLowerCase()];
+    } else if (skuPlatform != null) {
+      // Match all items with this SKU Platform
+      whereClause = 'LOWER(TRIM(sku_platform)) = ?';
+      whereArgs = [skuPlatform.trim().toLowerCase()];
     } else if (idSku != null) {
-      whereClause = 'id_sku = ?';
-      whereArgs = [idSku];
+      // Match all items with this ID SKU (variation)
+      whereClause = 'LOWER(TRIM(id_sku)) = ?';
+      whereArgs = [idSku.trim().toLowerCase()];
     } else {
       // If no criteria provided, we don't do bulk update (safety)
       return 0;

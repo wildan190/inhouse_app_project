@@ -9,7 +9,8 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:path/path.dart' as p;
 import '../models/product.dart';
 import 'package:http/http.dart' as http;
-import 'package:archive/archive.dart'; // Added for CRC32 calculation
+import 'package:archive/archive.dart';
+import 'package:file_picker/file_picker.dart'; // Added for directory picking
 
 class ImageService {
   /// Merges a product's details and image into a new composite image.
@@ -23,7 +24,10 @@ class ImageService {
         await outputDir.create(recursive: true);
       }
 
-      final outputPath = p.join(outputDir.path, 'merged_${product.noPesanan}_${DateTime.now().millisecondsSinceEpoch}.png');
+      // Use a more unique filename including product ID to prevent overwriting in concurrent processing
+      final cleanOrderNo = product.noPesanan.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      final cleanIdSku = product.idSku.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      final outputPath = p.join(outputDir.path, 'merged_${cleanOrderNo}_${cleanIdSku}_${product.id}_${DateTime.now().millisecondsSinceEpoch}.png');
 
       // 1. Load Resources in Parallel (MAX PERFORMANCE)
       final List<Future<ui.Image?>> loadingTasks = [];
@@ -218,6 +222,54 @@ class ImageService {
     final String path = args['path'];
     final Uint8List bytes = args['bytes'];
     await File(path).writeAsBytes(bytes);
+  }
+
+  /// Saves multiple merged images to a user-selected directory.
+  /// Ensures unique filenames for every single item, even with identical order numbers.
+  Future<bool> saveMergedImages(List<Product> products) async {
+    try {
+      print('DEBUG: Starting saveMergedImages for ${products.length} items');
+      String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
+      if (selectedDirectory == null) {
+        print('DEBUG: No directory selected');
+        return false;
+      }
+
+      final directory = Directory(selectedDirectory);
+      int savedCount = 0;
+      
+      for (var i = 0; i < products.length; i++) {
+        final product = products[i];
+        if (product.mergedImagePath == null) {
+          print('DEBUG: Product ${product.id} has no merged image path, skipping');
+          continue;
+        }
+
+        final sourceFile = File(product.mergedImagePath!);
+        if (!await sourceFile.exists()) {
+          print('DEBUG: Source file does not exist: ${product.mergedImagePath}, skipping');
+          continue;
+        }
+
+        // Construct an EXTREMELY unique filename to prevent any collision
+        // Format: [OrderNo]_[IDSKU]_Qty[Qty]_[DatabaseID].png
+        final cleanOrderNo = product.noPesanan.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
+        final cleanIdSku = product.idSku.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
+        
+        final fileName = '${cleanOrderNo}_${cleanIdSku}_Qty${product.jumlahBarang}_ID${product.id}.png';
+        final targetPath = p.join(directory.path, fileName);
+
+        print('DEBUG: Saving item ${i+1}/${products.length} to $targetPath');
+        await sourceFile.copy(targetPath);
+        savedCount++;
+      }
+      
+      print('DEBUG: Successfully saved $savedCount files to $selectedDirectory');
+      return savedCount > 0;
+    } catch (e) {
+      print('Error saving merged images: $e');
+      return false;
+    }
   }
 
   Future<void> _drawDetailsInContainer(
