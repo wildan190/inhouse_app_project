@@ -417,7 +417,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                             Icon(Icons.check_circle, color: Color(0xFF10B981), size: 14),
                                             SizedBox(width: 8),
                                             Expanded(
-                                              child: Text(
+                                              child: SelectableText(
                                                 orderNo,
                                                 style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
                                               ),
