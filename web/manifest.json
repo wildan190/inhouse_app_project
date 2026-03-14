@@ -1,6 +1,6 @@
 {
-    "name": "inhouse_app_project",
-    "short_name": "inhouse_app_project",
+    "name": "inhouseExport",
+    "short_name": "inhouseExport",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
