@@ -62,7 +62,7 @@ class ImageExportService {
 
           final cleanOrderNo = product.noPesanan.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
           
-          // Format: NoPesanan_Qty_CopyNum
+          // Format: NoPesanan_Qty[TotalQty]_Dup[ProductId]_[CopyNum]
           final fileName = '${cleanOrderNo}_Qty${product.jumlahBarang}_Dup${product.id}_${copyNum + 1}.png';
           final targetPath = p.join(targetDir.path, fileName);
 

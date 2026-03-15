@@ -141,7 +141,7 @@ class ImageProcessorService {
       'NO. PESANAN: $orderNo',
       'NO. RESI: $resi',
       'SKU PLATFORM: ${product.skuPlatform}',
-      'FILE: ${product.idSku}',
+      'FILE: ${groupInfo ?? '1-1'}',
     ];
 
     for (var line in lines) {
@@ -157,7 +157,7 @@ class ImageProcessorService {
     }
 
     // Qty (Large)
-    final qtyText = groupInfo != null ? 'Qty: ${product.jumlahBarang} ($groupInfo)' : 'Qty: ${product.jumlahBarang}';
+    final qtyText = 'Qty: ${product.jumlahBarang}';
     final qtyTp = TextPainter(
       text: TextSpan(text: qtyText, style: textStyleLarge),
       textDirection: ui.TextDirection.ltr,

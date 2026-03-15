@@ -58,17 +58,22 @@ class FloatingSearchBar extends StatelessWidget {
                   onChanged: (value) => provider.setSearchQuery(value),
                   onSubmitted: (_) => onSubmitted(),
                   autofocus: true,
+                  maxLines: null,
+                  keyboardType: TextInputType.multiline,
                   style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 13),
                   decoration: InputDecoration(
-                    hintText: 'Cari... (Pisahkan dengan spasi)',
+                    hintText: 'Cari Masal... (Pisahkan dengan Enter)',
                     hintStyle: TextStyle(color: isDark ? Colors.grey : Colors.grey[400], fontSize: 12),
                     prefixIcon: Icon(Icons.search, color: isDark ? Colors.grey : Colors.grey[400], size: 18),
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(vertical: 10),
                     suffix: controller.text.isNotEmpty 
-                      ? Text(
-                          '${provider.orderNumbers.length} hasil',
-                          style: TextStyle(color: isDark ? Colors.grey : Colors.grey[400], fontSize: 11),
+                      ? Padding(
+                          padding: const EdgeInsets.only(right: 8.0),
+                          child: Text(
+                            '${provider.orderNumbers.length} hasil',
+                            style: TextStyle(color: isDark ? Colors.grey : Colors.grey[400], fontSize: 11),
+                          ),
                         )
                       : null,
                   ),

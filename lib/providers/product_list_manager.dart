@@ -15,9 +15,9 @@ class ProductListManager {
 
   void updateSearch(String query) {
     searchQuery = query;
-    // Split query by any whitespace (spaces, tabs, newlines)
+    // Split query by newlines for mass search
     searchTerms = query
-        .split(RegExp(r'\s+'))
+        .split('\n')
         .map((e) => e.trim().toLowerCase())
         .where((e) => e.isNotEmpty)
         .toList();
