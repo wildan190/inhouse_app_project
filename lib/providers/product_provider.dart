@@ -278,7 +278,19 @@ class ProductProvider with ChangeNotifier {
   }
 
   void refreshProcessedList() {
-    _processedOrderNumbers = _listManager.products.where((p) => p.status == 'completed').map((p) => p.noPesanan).toSet().toList();
+    final Map<String, List<Product>> allGroups = _listManager.groupedProducts;
+    List<String> completedOrders = [];
+
+    allGroups.forEach((orderNo, items) {
+      // An order is only "processed" if ALL items in it are completed
+      bool isFullyProcessed = items.isNotEmpty && 
+                             items.every((p) => p.status == 'completed' && p.mergedImagePath != null);
+      if (isFullyProcessed) {
+        completedOrders.add(orderNo);
+      }
+    });
+
+    _processedOrderNumbers = completedOrders;
     notifyListeners();
   }
 
