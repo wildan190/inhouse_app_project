@@ -114,18 +114,18 @@ class ImageProcessorService {
     final double textLeft = left + padding;
     final double textMaxWidth = thumbLeft - textLeft - padding;
 
-    final double fontSizeSmall = height * 0.10; // Reduced from 0.12
-    final double fontSizeLarge = height * 0.22; // Reduced from 0.28
+    final double fontSizeSmall = height * 0.08; 
+    final double fontSizeLarge = height * 0.18; 
 
     final textStyleSmall = TextStyle(
       color: Colors.black, 
       fontSize: fontSizeSmall, 
-      fontWeight: FontWeight.normal, // Removed bold
+      fontWeight: FontWeight.bold,
     );
     final textStyleLarge = TextStyle(
       color: Colors.black, 
       fontSize: fontSizeLarge, 
-      fontWeight: FontWeight.normal, // Removed w900
+      fontWeight: FontWeight.bold,
     );
 
     double yOffset = top + padding;
@@ -133,7 +133,7 @@ class ImageProcessorService {
     // Helper to truncate text
     String truncate(String text, int max) => text.length > max ? text.substring(0, max) : text;
     final orderNo = truncate(product.noPesanan, 20);
-    final resi = truncate(product.nomorResi, 20);
+    final resi = truncate(product.nomorResi.toUpperCase(), 20);
 
     // Order No, SKU, Spec, Resi
     final lines = [
