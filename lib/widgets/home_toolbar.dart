@@ -21,7 +21,14 @@ class HomeToolbar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
-    final isDark = themeProvider.isDarkMode;
+    
+    // Determine dark mode based on themeMode or system brightness
+    bool isDark;
+    if (themeProvider.themeMode == ThemeMode.system) {
+      isDark = MediaQuery.of(context).platformBrightness == Brightness.dark;
+    } else {
+      isDark = themeProvider.themeMode == ThemeMode.dark;
+    }
 
     return Row(
       children: [
@@ -41,7 +48,7 @@ class HomeToolbar extends StatelessWidget {
             borderRadius: BorderRadius.circular(4),
           ),
           child: Text(
-            '${provider.products.length} Total',
+            '${provider.orderNumbers.length} Order, ${provider.products.length} Total, ${provider.totalQuantity} Qty',
             style: TextStyle(color: isDark ? Colors.grey : Colors.grey[600], fontSize: 11),
           ),
         ),
@@ -94,48 +101,6 @@ class HomeToolbar extends StatelessWidget {
               _buildUploadModeRadio('SKU Platform', 'sku', Colors.purple, isDark),
               _buildUploadModeRadio('ID SKU', 'id_sku', Colors.orange, isDark),
             ],
-          ),
-        ),
-        const SizedBox(width: 16),
-        // Search Box in Toolbar
-        Container(
-          width: 250,
-          height: 36,
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1F2937).withValues(alpha: 0.5) : Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: isDark ? const Color(0xFF374151) : Colors.grey[300]!),
-          ),
-          child: TextField(
-            controller: searchController,
-            onChanged: (value) => provider.setSearchQuery(value),
-            style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 13),
-            maxLines: 1,
-            decoration: InputDecoration(
-              hintText: 'Cari... (Spasi untuk pencarian masal)',
-              hintStyle: TextStyle(color: isDark ? Colors.grey : Colors.grey[400], fontSize: 11),
-              prefixIcon: Icon(Icons.search, color: isDark ? Colors.grey : Colors.grey[400], size: 18),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(vertical: 8),
-              suffixIcon: searchController.text.isNotEmpty 
-                ? Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '${provider.orderNumbers.length} ',
-                        style: TextStyle(color: isDark ? Colors.grey : Colors.grey[400], fontSize: 10),
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.clear, color: isDark ? Colors.grey : Colors.grey[400], size: 16),
-                        onPressed: () {
-                          searchController.clear();
-                          provider.setSearchQuery('');
-                        },
-                      ),
-                    ],
-                  )
-                : null,
-            ),
           ),
         ),
         const Spacer(),

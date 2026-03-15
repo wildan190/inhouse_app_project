@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:intl/intl.dart';
@@ -7,6 +8,7 @@ import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import '../models/product.dart';
 import '../providers/product_provider.dart';
+import '../providers/theme_provider.dart';
 
 class ProductRow extends StatefulWidget {
   final Product product;
@@ -39,99 +41,107 @@ class _ProductRowState extends State<ProductRow> {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
     final product = widget.product;
     final provider = widget.provider;
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    
+    bool isDark;
+    if (themeProvider.themeMode == ThemeMode.system) {
+      isDark = MediaQuery.of(context).platformBrightness == Brightness.dark;
+    } else {
+      isDark = themeProvider.themeMode == ThemeMode.dark;
+    }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-      decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(color: isDark ? const Color(0xFF1F2937).withValues(alpha: 0.5) : Colors.grey[200]!),
-        ),
-      ),
-      child: Row(
-        children: [
-          const SizedBox(width: 32),
-          // 1. PRODUCT INFORMATION
-          Expanded(
-            flex: 5,
-            child: Row(
-              children: [
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1F2937) : Colors.grey[100],
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: isDark ? const Color(0xFF374151) : Colors.grey[300]!),
-                  ),
-                  child: product.tautanGambarProduk.isNotEmpty
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(5),
-                          child: CachedNetworkImage(
-                            imageUrl: product.tautanGambarProduk,
-                            fit: BoxFit.cover,
-                            memCacheWidth: 120,
-                            placeholder: (context, url) => const SpinKitPulse(color: Colors.grey, size: 16),
-                            errorWidget: (context, url, error) => const Icon(Icons.image, color: Colors.grey, size: 20),
-                          ),
-                        )
-                      : const Icon(Icons.image, color: Colors.grey, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SelectableText(
-                        product.skuPlatform, 
-                        style: TextStyle(
-                          color: isDark ? Colors.white : Colors.black87,
-                          fontSize: 12, 
-                          fontWeight: FontWeight.bold
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF10B981).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(3),
-                          border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
-                        ),
-                        child: SelectableText(
-                          'ID SKU: ${product.idSku}', 
-                          style: const TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      SelectableText(
-                        product.spesifikasiProduk, 
-                        style: const TextStyle(color: Colors.grey, fontSize: 10), 
-                        maxLines: 1,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+    return DropTarget(
+      onDragDone: (detail) async {
+        if (detail.files.isNotEmpty) {
+          final file = File(detail.files.first.path);
+          widget.onImageUpload(product, file);
+        }
+      },
+      onDragEntered: (detail) => setState(() => _isDragging = true),
+      onDragExited: (detail) => setState(() => _isDragging = false),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        decoration: BoxDecoration(
+          color: _isDragging ? (isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05)) : Colors.transparent,
+          border: Border(
+            top: BorderSide(color: isDark ? const Color(0xFF1F2937).withValues(alpha: 0.5) : Colors.grey[200]!),
           ),
-          // 2. UPLOAD (Source Image)
-          Expanded(
-            flex: 2,
-            child: Center(
-              child: DropTarget(
-                onDragDone: (detail) async {
-                  if (detail.files.isNotEmpty) {
-                    final file = File(detail.files.first.path);
-                    widget.onImageUpload(product, file);
-                  }
-                },
-                onDragEntered: (detail) => setState(() => _isDragging = true),
-                onDragExited: (detail) => setState(() => _isDragging = false),
+        ),
+        child: Row(
+          children: [
+            const SizedBox(width: 32),
+            // 1. PRODUCT INFORMATION
+            Expanded(
+              flex: 5,
+              child: Row(
+                children: [
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1F2937) : Colors.grey[100],
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: isDark ? const Color(0xFF374151) : Colors.grey[300]!),
+                    ),
+                    child: product.tautanGambarProduk.isNotEmpty
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(5),
+                            child: CachedNetworkImage(
+                              imageUrl: product.tautanGambarProduk,
+                              fit: BoxFit.cover,
+                              memCacheWidth: 120,
+                              placeholder: (context, url) => const SpinKitPulse(color: Colors.grey, size: 16),
+                              errorWidget: (context, url, error) => const Icon(Icons.image, color: Colors.grey, size: 20),
+                            ),
+                          )
+                        : const Icon(Icons.image, color: Colors.grey, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SelectableText(
+                          product.skuPlatform, 
+                          style: TextStyle(
+                            color: isDark ? Colors.white : Colors.black87,
+                            fontSize: 12, 
+                            fontWeight: FontWeight.bold
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(3),
+                            border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+                          ),
+                          child: SelectableText(
+                            'ID SKU: ${product.idSku}', 
+                            style: const TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        SelectableText(
+                          product.spesifikasiProduk, 
+                          style: const TextStyle(color: Colors.grey, fontSize: 10), 
+                          maxLines: 1,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // 2. UPLOAD (Source Image)
+            Expanded(
+              flex: 2,
+              child: Center(
                 child: InkWell(
                   onTap: () async {
                     try {
@@ -172,7 +182,6 @@ class _ProductRowState extends State<ProductRow> {
                 ),
               ),
             ),
-          ),
           // 3. MERGED (Result Image)
           Expanded(
             flex: 2,
@@ -270,6 +279,7 @@ class _ProductRowState extends State<ProductRow> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }

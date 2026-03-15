@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/product.dart';
 import '../providers/product_provider.dart';
+import '../providers/theme_provider.dart';
 import 'product_row.dart';
 
 class OrderGroup extends StatelessWidget {
@@ -20,9 +22,16 @@ class OrderGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
     final isSelected = provider.selectedOrderNumbers.contains(orderNumber);
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    
+    bool isDark;
+    if (themeProvider.themeMode == ThemeMode.system) {
+      isDark = MediaQuery.of(context).platformBrightness == Brightness.dark;
+    } else {
+      isDark = themeProvider.themeMode == ThemeMode.dark;
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 6),

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../providers/product_provider.dart';
+import '../providers/theme_provider.dart';
 
 class FloatingSearchBar extends StatelessWidget {
   final bool isVisible;
@@ -23,8 +25,15 @@ class FloatingSearchBar extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!isVisible) return const SizedBox.shrink();
 
+    final themeProvider = Provider.of<ThemeProvider>(context);
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    
+    bool isDark;
+    if (themeProvider.themeMode == ThemeMode.system) {
+      isDark = MediaQuery.of(context).platformBrightness == Brightness.dark;
+    } else {
+      isDark = themeProvider.themeMode == ThemeMode.dark;
+    }
 
     return Positioned(
       top: 10,

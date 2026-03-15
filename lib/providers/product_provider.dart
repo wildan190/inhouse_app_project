@@ -29,6 +29,7 @@ class ProductProvider with ChangeNotifier {
   int get currentPage => _listManager.currentPage;
   int get pageSize => _listManager.pageSize;
   int get totalPages => _listManager.totalPages;
+  int get totalQuantity => _listManager.totalQuantity;
   List<String> get orderNumbers => _listManager.orderNumbers;
   List<String> get paginatedOrderNumbers => _listManager.paginatedOrderNumbers;
   Map<String, List<Product>> get groupedProducts => _listManager.groupedProducts;
@@ -104,9 +105,11 @@ class ProductProvider with ChangeNotifier {
 
   void toggleAllSelection(bool selected) {
     if (selected) {
-      _selectedOrderNumbers = Set.from(_listManager.orderNumbers);
+      _selectedOrderNumbers.addAll(_listManager.paginatedOrderNumbers);
     } else {
-      _selectedOrderNumbers.clear();
+      for (var orderNo in _listManager.paginatedOrderNumbers) {
+        _selectedOrderNumbers.remove(orderNo);
+      }
     }
     notifyListeners();
   }
@@ -171,6 +174,7 @@ class ProductProvider with ChangeNotifier {
         localImagePath: localImageFile.path,
         mergedImagePath: null,
         status: 'image_uploaded',
+        createdAt: product.createdAt,
       );
       await _dbService.updateProduct(updatedProduct);
       updatedCount = 1;
@@ -209,9 +213,10 @@ class ProductProvider with ChangeNotifier {
         localImagePath: product.localImagePath,
         mergedImagePath: mergedPath,
         status: 'completed',
+        createdAt: product.createdAt,
       );
       await _dbService.updateProduct(updatedProduct);
-      if (!silent) await fetchProducts();
+      if (!silent) await fetchProducts(updateLoading: false);
     }
   }
 
@@ -249,8 +254,21 @@ class ProductProvider with ChangeNotifier {
   }
 
   Future<bool> saveSelectedMerged() async {
+    // 1. Get all selected order numbers
+    if (_selectedOrderNumbers.isEmpty) return false;
+
+    // 2. Check if EVERY item in the selected orders is completed
+    for (var orderNo in _selectedOrderNumbers) {
+      final itemsInOrder = _listManager.groupedProducts[orderNo] ?? [];
+      
+      // If any item in the order is not completed or missing merged image, fail the whole save
+      bool allCompleted = itemsInOrder.every((p) => p.status == 'completed' && p.mergedImagePath != null);
+      if (!allCompleted) return false;
+    }
+
+    // 3. Collect all products from the selected orders (now we know they are all completed)
     List<Product> toSave = _listManager.products.where((p) => 
-      _selectedOrderNumbers.contains(p.noPesanan) && p.status == 'completed' && p.mergedImagePath != null
+      _selectedOrderNumbers.contains(p.noPesanan)
     ).toList();
 
     if (toSave.isEmpty) return false;
@@ -271,7 +289,7 @@ class ProductProvider with ChangeNotifier {
 
   Future<void> deleteProduct(int id) async {
     await _dbService.deleteProduct(id);
-    await fetchProducts();
+    await fetchProducts(updateLoading: false);
   }
 
   Future<void> deleteSelected() async {
@@ -283,7 +301,7 @@ class ProductProvider with ChangeNotifier {
       for (var p in products) await _dbService.deleteProduct(p.id!);
     }
     _selectedOrderNumbers.clear();
-    await fetchProducts();
+    await fetchProducts(updateLoading: false);
     _isLoading = false;
     notifyListeners();
   }

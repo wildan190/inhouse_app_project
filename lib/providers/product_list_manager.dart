@@ -6,8 +6,8 @@ class ProductListManager {
   List<String> searchTerms = [];
   int currentPage = 1;
   int pageSize = 10;
-  String sortColumn = 'time';
-  bool isAscending = false;
+  String sortColumn = 'sku';
+  bool isAscending = true;
 
   Map<String, List<Product>> groupedProducts = {};
   List<String> orderNumbers = [];
@@ -51,6 +51,9 @@ class ProductListManager {
       switch (sortColumn) {
         case 'sku':
           cmp = a.skuPlatform.toLowerCase().compareTo(b.skuPlatform.toLowerCase());
+          if (cmp == 0) {
+            cmp = a.idSku.toLowerCase().compareTo(b.idSku.toLowerCase());
+          }
           break;
         case 'id_sku':
           cmp = a.idSku.toLowerCase().compareTo(b.idSku.toLowerCase());
@@ -94,6 +97,14 @@ class ProductListManager {
   }
 
   int get totalPages => (orderNumbers.length / pageSize).ceil();
+
+  int get totalQuantity {
+    int sum = 0;
+    for (var p in products) {
+      sum += p.jumlahBarang;
+    }
+    return sum;
+  }
 
   int calculateSelectedItemsCount(Set<String> selectedOrderNumbers) {
     int count = 0;

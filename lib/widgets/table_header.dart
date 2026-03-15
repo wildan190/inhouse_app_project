@@ -1,17 +1,33 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../providers/product_provider.dart';
+import '../providers/theme_provider.dart';
 
-class TableHeader extends StatelessWidget {
+class TableHeader extends StatefulWidget {
   final ProductProvider provider;
 
   const TableHeader({super.key, required this.provider});
 
   @override
+  State<TableHeader> createState() => _TableHeaderState();
+}
+
+class _TableHeaderState extends State<TableHeader> {
+  String? _hoveredColumn;
+
+  @override
   Widget build(BuildContext context) {
-    final allSelected = provider.orderNumbers.isNotEmpty && 
-                       provider.selectedOrderNumbers.length == provider.orderNumbers.length;
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final allSelected = widget.provider.paginatedOrderNumbers.isNotEmpty && 
+                       widget.provider.paginatedOrderNumbers.every((orderNo) => widget.provider.selectedOrderNumbers.contains(orderNo));
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    
+    bool isDark;
+    if (themeProvider.themeMode == ThemeMode.system) {
+      isDark = MediaQuery.of(context).platformBrightness == Brightness.dark;
+    } else {
+      isDark = themeProvider.themeMode == ThemeMode.dark;
+    }
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
@@ -27,7 +43,7 @@ class TableHeader extends StatelessWidget {
             height: 24, width: 24,
             child: Checkbox(
               value: allSelected,
-              onChanged: (v) => provider.toggleAllSelection(v ?? false),
+              onChanged: (v) => widget.provider.toggleAllSelection(v ?? false),
               checkColor: Colors.white,
               activeColor: const Color(0xFF6D28D9),
             ),
@@ -37,9 +53,9 @@ class TableHeader extends StatelessWidget {
             flex: 5,
             child: Row(
               children: [
-                _buildSortableHeader('PRODUCT INFO', 'sku', provider),
-                const SizedBox(width: 8),
-                _buildSortableHeader('ID SKU', 'id_sku', provider),
+                const Text('PRODUCT INFORMATION', style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold)),
+                const SizedBox(width: 12),
+                _buildSortableHeader('SKU PLATFORM', 'sku', widget.provider),
               ],
             ),
           ),
@@ -74,7 +90,7 @@ class TableHeader extends StatelessWidget {
           Expanded(
             flex: 2,
             child: Center(
-              child: _buildSortableHeader('TIME', 'time', provider),
+              child: _buildSortableHeader('TIME', 'time', widget.provider),
             ),
           ),
           const Expanded(
@@ -90,24 +106,44 @@ class TableHeader extends StatelessWidget {
 
   Widget _buildSortableHeader(String label, String column, ProductProvider provider) {
     final isSelected = provider.sortColumn == column;
-    return InkWell(
-      onTap: () => provider.setSort(column),
-      borderRadius: BorderRadius.circular(4),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(label, style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold)),
-            const SizedBox(width: 4),
-            Icon(
-              isSelected 
-                ? (provider.isAscending ? Icons.arrow_upward : Icons.arrow_downward) 
-                : Icons.arrow_downward,
-              size: 12,
-              color: isSelected ? const Color(0xFF6D28D9) : Colors.grey.withValues(alpha: 0.3),
+    final isHovered = _hoveredColumn == column;
+    
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hoveredColumn = column),
+      onExit: (_) => setState(() => _hoveredColumn = null),
+      child: GestureDetector(
+        onTap: () => provider.setSort(column),
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          decoration: BoxDecoration(
+            color: isHovered ? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05)) : Colors.transparent,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label, 
+                  style: TextStyle(
+                    color: isSelected ? const Color(0xFF6D28D9) : Colors.grey, 
+                    fontSize: 11, 
+                    fontWeight: FontWeight.bold
+                  )
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  isSelected 
+                    ? (provider.isAscending ? Icons.arrow_upward : Icons.arrow_downward) 
+                    : Icons.arrow_downward,
+                  size: 12,
+                  color: isSelected ? const Color(0xFF6D28D9) : Colors.grey.withValues(alpha: 0.3),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

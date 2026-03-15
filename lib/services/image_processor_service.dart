@@ -130,10 +130,15 @@ class ImageProcessorService {
 
     double yOffset = top + padding;
 
+    // Helper to truncate text
+    String truncate(String text, int max) => text.length > max ? text.substring(0, max) : text;
+    final orderNo = truncate(product.noPesanan, 20);
+    final resi = truncate(product.nomorResi, 20);
+
     // Order No, SKU, Spec, Resi
     final lines = [
-      'NO. PESANAN: ${product.noPesanan}',
-      'RESI: ${product.nomorResi}',
+      'NO. PESANAN: $orderNo',
+      'RESI: $resi',
       'SKU: ${product.idSku}',
       'SPEC: ${product.spesifikasiProduk}',
     ];
@@ -142,6 +147,8 @@ class ImageProcessorService {
       final tp = TextPainter(
         text: TextSpan(text: line, style: textStyleSmall),
         textDirection: ui.TextDirection.ltr,
+        maxLines: 1,
+        ellipsis: '...',
       );
       tp.layout(maxWidth: textMaxWidth);
       tp.paint(canvas, Offset(textLeft, yOffset));
@@ -152,6 +159,8 @@ class ImageProcessorService {
     final qtyTp = TextPainter(
       text: TextSpan(text: 'Qty: ${product.jumlahBarang}', style: textStyleLarge),
       textDirection: ui.TextDirection.ltr,
+      maxLines: 1,
+      ellipsis: '...',
     );
     qtyTp.layout(maxWidth: textMaxWidth);
     // Draw Qty at the bottom of the container
