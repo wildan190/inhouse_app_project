@@ -69,7 +69,8 @@ class ImageProcessorService {
     double top, 
     int width, 
     int height,
-    ui.Image? linkedImage
+    ui.Image? linkedImage,
+    {String? groupInfo}
   ) async {
     final double padding = height * 0.1;
     final double contentHeight = height.toDouble() - (padding * 2);
@@ -138,9 +139,9 @@ class ImageProcessorService {
     // Order No, SKU, Spec, Resi
     final lines = [
       'NO. PESANAN: $orderNo',
-      'RESI: $resi',
-      'SKU: ${product.idSku}',
-      'SPEC: ${product.spesifikasiProduk}',
+      'NO. RESI: $resi',
+      'SKU PLATFORM: ${product.skuPlatform}',
+      'FILE: ${product.idSku}',
     ];
 
     for (var line in lines) {
@@ -156,8 +157,9 @@ class ImageProcessorService {
     }
 
     // Qty (Large)
+    final qtyText = groupInfo != null ? 'Qty: ${product.jumlahBarang} ($groupInfo)' : 'Qty: ${product.jumlahBarang}';
     final qtyTp = TextPainter(
-      text: TextSpan(text: 'Qty: ${product.jumlahBarang}', style: textStyleLarge),
+      text: TextSpan(text: qtyText, style: textStyleLarge),
       textDirection: ui.TextDirection.ltr,
       maxLines: 1,
       ellipsis: '...',

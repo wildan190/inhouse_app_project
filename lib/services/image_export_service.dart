@@ -53,16 +53,17 @@ class ImageExportService {
         final product = products[i];
         if (product.mergedImagePath == null) continue;
 
-        final sourceFile = File(product.mergedImagePath!);
-        if (!await sourceFile.exists()) continue;
-
-        final int qty = product.jumlahBarang > 0 ? product.jumlahBarang : 1;
+        // Split multiple paths if they exist
+        final List<String> sourcePaths = product.mergedImagePath!.split('|');
         
-        for (int copyNum = 1; qty >= copyNum; copyNum++) {
+        for (int copyNum = 0; copyNum < sourcePaths.length; copyNum++) {
+          final sourceFile = File(sourcePaths[copyNum]);
+          if (!await sourceFile.exists()) continue;
+
           final cleanOrderNo = product.noPesanan.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
           
-          // Format: NoPesanan_Qty_CopyNum (Using product ID to ensure uniqueness if multiple items in same order)
-          final fileName = '${cleanOrderNo}_Qty${product.jumlahBarang}_Dup${product.id}_$copyNum.png';
+          // Format: NoPesanan_Qty_CopyNum
+          final fileName = '${cleanOrderNo}_Qty${product.jumlahBarang}_Dup${product.id}_${copyNum + 1}.png';
           final targetPath = p.join(targetDir.path, fileName);
 
           await sourceFile.copy(targetPath);

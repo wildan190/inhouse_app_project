@@ -197,7 +197,7 @@ class _ProductRowState extends State<ProductRow> {
                 child: product.mergedImagePath != null
                     ? ClipRRect(
                         borderRadius: BorderRadius.circular(5),
-                        child: Image.file(File(product.mergedImagePath!), fit: BoxFit.cover, cacheWidth: 120),
+                        child: Image.file(File(product.mergedImagePath!.split('|').first), fit: BoxFit.cover, cacheWidth: 120),
                       )
                     : const Icon(Icons.image_not_supported, color: Colors.grey, size: 20),
               ),
@@ -210,8 +210,14 @@ class _ProductRowState extends State<ProductRow> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                SelectableText(product.nomorResi, style: const TextStyle(color: Colors.white, fontSize: 11)),
-                SelectableText(product.noPesanan, style: const TextStyle(color: Colors.grey, fontSize: 10)),
+                SelectableText(
+                  product.nomorResi, 
+                  style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 11)
+                ),
+                SelectableText(
+                  product.noPesanan, 
+                  style: TextStyle(color: isDark ? Colors.grey : Colors.grey[600], fontSize: 10)
+                ),
               ],
             ),
           ),
@@ -219,7 +225,14 @@ class _ProductRowState extends State<ProductRow> {
           Expanded(
             flex: 1,
             child: Center(
-              child: SelectableText(product.jumlahBarang.toString(), style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+              child: SelectableText(
+                product.jumlahBarang.toString(), 
+                style: TextStyle(
+                  color: isDark ? Colors.white : Colors.black87, 
+                  fontSize: 13, 
+                  fontWeight: FontWeight.bold
+                )
+              ),
             ),
           ),
           // 6. STATUS
