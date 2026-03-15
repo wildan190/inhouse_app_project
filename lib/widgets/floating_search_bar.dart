@@ -36,7 +36,7 @@ class FloatingSearchBar extends StatelessWidget {
     }
 
     return Positioned(
-      top: 10,
+      top: 60, // Lowered from 10 to not cover toolbar buttons
       right: 20,
       child: Material(
         elevation: 8,
