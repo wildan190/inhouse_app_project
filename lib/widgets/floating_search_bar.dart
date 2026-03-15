@@ -44,44 +44,53 @@ class FloatingSearchBar extends StatelessWidget {
         color: theme.cardColor,
         child: Container(
           width: 350,
+          constraints: const BoxConstraints(maxHeight: 300), // Limits total height to 300px
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             border: Border.all(color: isDark ? const Color(0xFF374151) : Colors.grey[300]!),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start, // Align close button to top
             children: [
               Expanded(
-                child: TextField(
-                  controller: controller,
-                  focusNode: focusNode,
-                  onChanged: (value) => provider.setSearchQuery(value),
-                  onSubmitted: (_) => onSubmitted(),
-                  autofocus: true,
-                  maxLines: null,
-                  keyboardType: TextInputType.multiline,
-                  style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 13),
-                  decoration: InputDecoration(
-                    hintText: 'Cari Masal... (Pisahkan dengan Enter)',
-                    hintStyle: TextStyle(color: isDark ? Colors.grey : Colors.grey[400], fontSize: 12),
-                    prefixIcon: Icon(Icons.search, color: isDark ? Colors.grey : Colors.grey[400], size: 18),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                    suffix: controller.text.isNotEmpty 
-                      ? Padding(
-                          padding: const EdgeInsets.only(right: 8.0),
-                          child: Text(
-                            '${provider.orderNumbers.length} hasil',
-                            style: TextStyle(color: isDark ? Colors.grey : Colors.grey[400], fontSize: 11),
-                          ),
-                        )
-                      : null,
+                child: Scrollbar( // Add scrollbar for better visibility
+                  child: TextField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    onChanged: (value) => provider.setSearchQuery(value),
+                    onSubmitted: (_) => onSubmitted(),
+                    autofocus: true,
+                    maxLines: null, // Still dynamic but constrained by parent
+                    keyboardType: TextInputType.multiline,
+                    style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 13),
+                    decoration: InputDecoration(
+                      hintText: 'Cari Masal... (Pisahkan dengan Enter)',
+                      hintStyle: TextStyle(color: isDark ? Colors.grey : Colors.grey[400], fontSize: 12),
+                      prefixIcon: Icon(Icons.search, color: isDark ? Colors.grey : Colors.grey[400], size: 18),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                      suffix: controller.text.isNotEmpty 
+                        ? Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: Text(
+                              '${provider.orderNumbers.length} hasil',
+                              style: TextStyle(color: isDark ? Colors.grey : Colors.grey[400], fontSize: 11),
+                            ),
+                          )
+                        : null,
+                    ),
                   ),
                 ),
               ),
-              IconButton(
-                icon: Icon(Icons.close, color: isDark ? Colors.grey : Colors.grey[400], size: 18),
-                onPressed: onClose,
+              Padding(
+                padding: const EdgeInsets.only(top: 4.0),
+                child: IconButton(
+                  icon: Icon(Icons.close, color: isDark ? Colors.grey : Colors.grey[400], size: 18),
+                  onPressed: onClose,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
               ),
             ],
           ),
