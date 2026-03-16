@@ -41,29 +41,35 @@ class HomeToolbar extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1F2937) : Colors.grey[200],
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Text(
-            '${provider.orderNumbers.length} Order, ${provider.products.length} Total, ${provider.totalQuantity} Qty',
-            style: TextStyle(color: isDark ? Colors.grey : Colors.grey[600], fontSize: 11),
+        Flexible(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1F2937) : Colors.grey[200],
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              '${provider.orderNumbers.length} Order, ${provider.products.length} Total, ${provider.totalQuantity} Qty',
+              style: TextStyle(color: isDark ? Colors.grey : Colors.grey[600], fontSize: 11),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ),
         if (provider.selectedOrderNumbers.isNotEmpty) ...[
           const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: const Color(0xFF6D28D9).withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: const Color(0xFF6D28D9)),
-            ),
-            child: Text(
-              '${provider.selectedOrderNumbers.length} Orders (${provider.selectedItemsCount} Items) Selected',
-              style: const TextStyle(color: Color(0xFFA78BFA), fontSize: 11, fontWeight: FontWeight.bold),
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFF6D28D9).withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: const Color(0xFF6D28D9)),
+              ),
+              child: Text(
+                '${provider.selectedOrderNumbers.length} Orders (${provider.selectedItemsCount} Items) Selected',
+                style: const TextStyle(color: Color(0xFFA78BFA), fontSize: 11, fontWeight: FontWeight.bold),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ),
         ],
