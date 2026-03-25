@@ -229,16 +229,35 @@ class ProductProvider with ChangeNotifier {
     notifyListeners();
     
     final stopwatch = Stopwatch()..start();
-    List<Product> toProcess = _listManager.products.where((p) => _selectedOrderNumbers.contains(p.noPesanan)).toList();
+    List<Product> allToProcess = _listManager.products.where((p) => _selectedOrderNumbers.contains(p.noPesanan)).toList();
+    
+    // Filter out already completed products to optimize
+    List<Product> toProcess = allToProcess.where((p) => p.status != 'completed' || p.mergedImagePath == null).toList();
+    
+    if (toProcess.isEmpty) {
+      _isProcessing = false;
+      _isLoading = false;
+      _progress = 0;
+      notifyListeners();
+      return;
+    }
+
     int total = toProcess.length;
-    int completed = 0;
+    int workerCompleted = 0;
+    int nextIdx = 0;
 
     Future<void> runWorker() async {
-      while (completed < total) {
-        final currentIdx = completed++;
-        if (currentIdx >= total) break;
-        await mergeProduct(toProcess[currentIdx], silent: true);
-        _progress = completed / total;
+      while (true) {
+        int idx;
+        // Use a local scope to get the next index to avoid race conditions
+        if (nextIdx >= total) return;
+        idx = nextIdx++;
+        if (idx >= total) return;
+        
+        await mergeProduct(toProcess[idx], silent: true);
+        
+        workerCompleted++;
+        _progress = workerCompleted / total;
         _processingDuration = stopwatch.elapsed;
         notifyListeners();
       }

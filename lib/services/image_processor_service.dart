@@ -141,6 +141,7 @@ class ImageProcessorService {
       'NO. PESANAN: $orderNo',
       'NO. RESI: $resi',
       'SKU PLATFORM: ${product.skuPlatform}',
+      'SPEC: ${product.spesifikasiProduk}',
       'FILE: ${groupInfo ?? '1-1'}',
     ];
 
