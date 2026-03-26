@@ -229,8 +229,21 @@ class ProductProvider with ChangeNotifier {
     notifyListeners();
     
     final stopwatch = Stopwatch()..start();
-    List<Product> toProcess = _listManager.products.where((p) => _selectedOrderNumbers.contains(p.noPesanan)).toList();
+    List<Product> toProcess = _listManager.products
+        .where((p) => _selectedOrderNumbers.contains(p.noPesanan))
+        .where((p) => p.status != 'completed' || p.mergedImagePath == null)
+        .toList();
+    
     int total = toProcess.length;
+    if (total == 0) {
+      stopwatch.stop();
+      _isProcessing = false;
+      _isLoading = false;
+      _progress = 0;
+      notifyListeners();
+      return;
+    }
+    
     int completed = 0;
 
     Future<void> runWorker() async {
