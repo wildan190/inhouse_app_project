@@ -114,17 +114,34 @@ class _ProductRowState extends State<ProductRow> {
                           ),
                         ),
                         const SizedBox(height: 2),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF10B981).withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(3),
-                            border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
-                          ),
-                          child: SelectableText(
-                            'ID SKU: ${product.idSku}', 
-                            style: const TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold),
-                          ),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(3),
+                                border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+                              ),
+                              child: SelectableText(
+                                'ID SKU: ${product.idSku}', 
+                                style: const TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(3),
+                                border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                              ),
+                              child: SelectableText(
+                                'ID PRODUK: ${product.idProduk}', 
+                                style: const TextStyle(color: Colors.blue, fontSize: 10, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 2),
                         SelectableText(

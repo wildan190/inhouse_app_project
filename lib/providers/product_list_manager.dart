@@ -33,6 +33,7 @@ class ProductListManager {
         for (final term in searchTerms) {
           if (p.skuPlatform.toLowerCase().contains(term) ||
               p.idSku.toLowerCase().contains(term) ||
+              p.idProduk.toLowerCase().contains(term) ||
               p.noPesanan.toLowerCase().contains(term) ||
               p.nomorResi.toLowerCase().contains(term) ||
               p.spesifikasiProduk.toLowerCase().contains(term)) {
