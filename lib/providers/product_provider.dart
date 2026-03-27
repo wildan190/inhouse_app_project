@@ -257,7 +257,7 @@ class ProductProvider with ChangeNotifier {
       }
     }
 
-    await Future.wait(List.generate(8, (_) => runWorker()));
+    await Future.wait(List.generate(4, (_) => runWorker()));
     stopwatch.stop();
     await fetchProducts(updateLoading: false);
     _isProcessing = false;
@@ -285,9 +285,29 @@ class ProductProvider with ChangeNotifier {
     ).toList();
 
     if (toSave.isEmpty) return false;
-    final success = await _imageService.saveMergedImages(toSave);
-    if (success) refreshProcessedList();
-    return success;
+
+    _isLoading = true;
+    _isProcessing = true; // Use processing flag to show progress bar
+    _progress = 0;
+    notifyListeners();
+
+    try {
+      final success = await _imageService.saveMergedImages(
+        toSave, 
+        onProgress: (val) {
+          _progress = val;
+          notifyListeners();
+        }
+      );
+      
+      if (success) refreshProcessedList();
+      return success;
+    } finally {
+      _isLoading = false;
+      _isProcessing = false;
+      _progress = 0;
+      notifyListeners();
+    }
   }
 
   void refreshProcessedList() {

@@ -109,5 +109,6 @@ class ImageService {
     return null;
   }
 
-  Future<bool> saveMergedImages(List<Product> products) => _exportService.saveMergedImages(products);
+  Future<bool> saveMergedImages(List<Product> products, {Function(double)? onProgress}) => 
+      _exportService.saveMergedImages(products, onProgress: onProgress);
 }
