@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:intl/intl.dart';
 import 'package:file_picker/file_picker.dart';
@@ -13,83 +14,79 @@ class ImageExportService {
     await File(path).writeAsBytes(bytes);
   }
 
-  /// Saves multiple merged images to a user-selected directory.
-  /// Ensures unique filenames for every single item, even with identical order numbers.
-  /// Wraps results in a folder if there's more than one item.
+  // Background isolate function for file copying
+  static Future<void> copyFileTask(Map<String, String> args) async {
+    final String source = args['source']!;
+    final String target = args['target']!;
+    final sourceFile = File(source);
+    if (await sourceFile.exists()) {
+      await sourceFile.copy(target);
+    }
+  }
+
+  /// Saves multiple merged images to a user-selected directory using a sequential queue.
+  /// Ensures the UI thread is not blocked by moving file I/O to background isolates.
   Future<bool> saveMergedImages(List<Product> products, {Function(double)? onProgress}) async {
     try {
-      print('DEBUG: Starting saveMergedImages for ${products.length} items');
+      print('DEBUG: Starting saveMergedImages with queue for ${products.length} products');
       String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
-      if (selectedDirectory == null) {
-        print('DEBUG: No directory selected');
-        return false;
-      }
+      if (selectedDirectory == null) return false;
 
-      // 1. Pre-calculate total files to be saved for progress tracking
-      int totalFilesExpected = 0;
-      for (var p in products) {
-        if (p.mergedImagePath != null) {
-          totalFilesExpected += p.mergedImagePath!.split('|').length;
-        }
-      }
-
-      if (totalFilesExpected == 0) return false;
-
-      Directory targetDir = Directory(selectedDirectory);
+      // 1. GATHER ALL TASKS (Preparing the Queue)
+      final List<Map<String, String>> copyQueue = [];
       
-      // 2. Create a timestamped folder to avoid clutter and permissions issues with root folders
+      // Create a timestamped folder
       final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
       final folderName = 'Merged_Results_$timestamp';
-      targetDir = Directory(p.join(selectedDirectory, folderName));
+      final targetDir = Directory(p.join(selectedDirectory, folderName));
       if (!await targetDir.exists()) {
         await targetDir.create(recursive: true);
       }
 
-      int savedCount = 0;
-      
-      // 3. Process sequentially with yield points to keep UI responsive
-      for (var i = 0; i < products.length; i++) {
-        final product = products[i];
+      for (var product in products) {
         if (product.mergedImagePath == null) continue;
-
         final List<String> sourcePaths = product.mergedImagePath!.split('|');
         
         for (int copyNum = 0; copyNum < sourcePaths.length; copyNum++) {
-          try {
-            final sourceFile = File(sourcePaths[copyNum]);
-            if (!await sourceFile.exists()) {
-              print('DEBUG: Source file not found: ${sourcePaths[copyNum]}');
-              continue;
-            }
+          final cleanOrderNo = product.noPesanan.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
+          final fileName = '${cleanOrderNo}_Qty${product.jumlahBarang}_Dup${product.id}_${copyNum + 1}.png';
+          final targetPath = p.join(targetDir.path, fileName);
+          
+          copyQueue.add({
+            'source': sourcePaths[copyNum],
+            'target': targetPath,
+          });
+        }
+      }
 
-            final cleanOrderNo = product.noPesanan.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
-            final fileName = '${cleanOrderNo}_Qty${product.jumlahBarang}_Dup${product.id}_${copyNum + 1}.png';
-            final targetPath = p.join(targetDir.path, fileName);
+      final int totalTasks = copyQueue.length;
+      if (totalTasks == 0) return false;
 
-            // Use copySync for better performance inside try-catch if we want, 
-            // but copy is already async. Let's stick with copy but add a yield.
-            await sourceFile.copy(targetPath);
-            savedCount++;
-
-            if (onProgress != null) {
-              onProgress(savedCount / totalFilesExpected);
-            }
-
-            // Allow event loop to process other things (UI updates)
-            if (savedCount % 5 == 0) {
-              await Future.delayed(const Duration(milliseconds: 10));
-            }
-          } catch (e) {
-            print('DEBUG: Error copying file ${sourcePaths[copyNum]}: $e');
-            // Continue with other files even if one fails
+      // 2. PROCESS QUEUE SEQUENTIALLY (Worker Pattern)
+      int completedTasks = 0;
+      
+      for (var task in copyQueue) {
+        try {
+          // Use compute to move the actual file copy (I/O) to a background Isolate
+          await compute(ImageExportService.copyFileTask, task);
+          
+          completedTasks++;
+          if (onProgress != null) {
+            onProgress(completedTasks / totalTasks);
           }
+
+          // Force a small yield to keep the main isolate's event loop breathing
+          // This ensures the progress bar updates smoothly even on slow disks
+          await Future.delayed(const Duration(milliseconds: 5));
+        } catch (e) {
+          print('DEBUG: Error in copy task for ${task['source']}: $e');
         }
       }
       
-      print('DEBUG: Successfully saved $savedCount/$totalFilesExpected files to ${targetDir.path}');
-      return savedCount > 0;
+      print('DEBUG: Successfully processed queue: $completedTasks/$totalTasks files saved');
+      return completedTasks > 0;
     } catch (e) {
-      print('CRITICAL: Error in saveMergedImages: $e');
+      print('CRITICAL: Error in saveMergedImages queue: $e');
       return false;
     }
   }
