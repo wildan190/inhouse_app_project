@@ -80,7 +80,7 @@ class ImageService {
 
         // Draw the Original Image
         double imageX = (finalCanvasWidth - uiImage.width) / 2;
-        canvas.drawImage(uiImage, Offset(imageX, headerAreaHeight + gapBetweenHeaderAndImage), Paint());
+        canvas.drawImage(uiImage, Offset(imageX, headerAreaHeight + gapBetweenHeaderAndImage), Paint()..filterQuality = ui.FilterQuality.high);
         
         // 4. Finalize and Save
         final picture = recorder.endRecording();

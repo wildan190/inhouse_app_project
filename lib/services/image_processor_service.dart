@@ -94,7 +94,7 @@ class ImageProcessorService {
       );
 
       final qrImage = await painter.toImage(qrSize);
-      canvas.drawImage(qrImage, Offset(qrLeft, top + padding), Paint());
+      canvas.drawImage(qrImage, Offset(qrLeft, top + padding), Paint()..filterQuality = ui.FilterQuality.high);
       qrImage.dispose();
     }
 

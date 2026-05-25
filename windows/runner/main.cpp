@@ -17,6 +17,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   // plugins.
   ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
+  // Set environment variables to force high-performance GPU and enable Impeller if possible
+  _wputenv_s(L"FLUTTER_ENABLE_IMPELLER", L"1");
+  _wputenv_s(L"SHED_HIGH_PERFORMANCE_GPU", L"1");
+
   flutter::DartProject project(L"data");
 
   std::vector<std::string> command_line_arguments =
