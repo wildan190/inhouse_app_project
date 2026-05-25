@@ -128,6 +128,18 @@ class HomeToolbar extends StatelessWidget {
           }
         }, const Color(0xFF374151)),
         const SizedBox(width: 6),
+        _buildActionButton('Auto Upload Folder', Icons.folder_zip, () async {
+          final count = await provider.autoUploadFromFolder();
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Berhasil mengunggah $count gambar secara otomatis.'),
+                backgroundColor: count > 0 ? Colors.green : Colors.orange,
+              ),
+            );
+          }
+        }, const Color(0xFFD97706)),
+        const SizedBox(width: 6),
         _buildActionButton('Save Selected Merged', Icons.save_alt, () async {
           final success = await provider.saveSelectedMerged();
           if (!success && context.mounted) {

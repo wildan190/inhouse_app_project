@@ -54,6 +54,7 @@ dependencies:
   csv: ^6.0.0
   syncfusion_flutter_xlsio: ^28.2.3
   spreadsheet_decoder: ^2.1.1
+  crypto: ^3.0.7
 
 dev_dependencies:
   flutter_test:

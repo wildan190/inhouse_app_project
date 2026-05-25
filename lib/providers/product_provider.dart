@@ -1,16 +1,19 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
+import 'package:file_picker/file_picker.dart';
 import '../models/product.dart';
 import '../services/database_service.dart';
 import '../services/image_service.dart';
 import '../services/excel_service.dart';
+import '../services/auto_upload_service.dart';
 import 'product_list_manager.dart';
 
 class ProductProvider with ChangeNotifier {
   final DatabaseService _dbService = DatabaseService();
   final ImageService _imageService = ImageService();
   final ExcelService _excelService = ExcelService();
+  final AutoUploadService _autoUploadService = AutoUploadService();
   final ProductListManager _listManager = ProductListManager();
 
   bool _isLoading = false;
@@ -349,5 +352,65 @@ class ProductProvider with ChangeNotifier {
     await fetchProducts(updateLoading: false);
     _isLoading = false;
     notifyListeners();
+  }
+
+  Future<int> autoUploadFromFolder() async {
+    String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
+    if (selectedDirectory == null) return 0;
+
+    _isLoading = true;
+    _isProcessing = true;
+    _progress = 0;
+    notifyListeners();
+
+    try {
+      final directory = Directory(selectedDirectory);
+      final List<FileSystemEntity> entities = await directory.list().toList();
+      final List<File> imageFiles = entities
+          .whereType<File>()
+          .where((file) {
+            final ext = p.extension(file.path).toLowerCase();
+            return ext == '.jpg' || ext == '.jpeg' || ext == '.png' || ext == '.webp';
+          })
+          .toList();
+
+      if (imageFiles.isEmpty) return 0;
+
+      // Use the tested AutoUploadService for matching
+      final Map<int, File> matchedMap = _autoUploadService.matchProductsWithFiles(_listManager.products, imageFiles);
+      
+      if (matchedMap.isEmpty) return 0;
+
+      int matchedCount = 0;
+      int totalToProcess = matchedMap.length;
+      int processedCount = 0;
+
+      // Process only matched items
+      for (var entry in matchedMap.entries) {
+        final productId = entry.key;
+        final matchedFile = entry.value;
+        
+        // Find the product in our list
+        final product = _listManager.products.firstWhere((p) => p.id == productId);
+        
+        await updateProductImage(product, matchedFile, syncMode: 'single');
+        
+        processedCount++;
+        _progress = processedCount / totalToProcess;
+        notifyListeners();
+        matchedCount++;
+      }
+
+      await fetchProducts(updateLoading: false);
+      return matchedCount;
+    } catch (e) {
+      print('Error in autoUploadFromFolder: $e');
+      return 0;
+    } finally {
+      _isLoading = false;
+      _isProcessing = false;
+      _progress = 0;
+      notifyListeners();
+    }
   }
 }
